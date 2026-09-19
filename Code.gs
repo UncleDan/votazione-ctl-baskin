@@ -1,6 +1,6 @@
 /**
  * Votazione CTL — voto online anonimo, un voto per società
- * v1 — Google Apps Script legato a un Foglio Google
+ * v2 — Google Apps Script legato a un Foglio Google
  *
  * Anonimato: le schede sono salvate nelle Script Properties (non nel foglio,
  * quindi senza cronologia versioni), senza codice né orario, e inserite in
@@ -34,7 +34,7 @@ function setup() {
     ['Titolo', 'Elezione CTL Baskin', 'Titolo della pagina di voto'],
     ['Stato', 'CHIUSA', 'APERTA / CHIUSA — usa il menu'],
     ['Max preferenze', '', 'Vuoto = metà dei candidati arrotondata per eccesso'],
-    ['Numero eletti', '', 'Posti da assegnare (vuoto = solo graduatoria)'],
+    ['Numero eletti', '', 'Vuoto = regola CTL: metà delle società per eccesso, min 3, max 6'],
     ['Messaggio', 'Seleziona i candidati a cui dai la preferenza.', 'Testo sopra la scheda']
   ]);
   ensureSheet_(ss, SH.CAND, [['Candidato', 'Anni tesseramento/incarichi (spareggio)', 'Note']]);
@@ -89,9 +89,12 @@ function codiceCasuale_() {
 }
 
 function apriVotazione() {
-  if (candidati_().length < 1) return SpreadsheetApp.getUi().alert('Nessun candidato inserito.');
+  const ui = SpreadsheetApp.getUi();
+  const n = candidati_().length, posti = posti_(cfg_());
+  if (n < 1) return ui.alert('Nessun candidato inserito.');
+  if (n < posti && ui.alert('Candidati insufficienti', 'Ci sono ' + n + ' candidati per ' + posti + ' posti. Aprire comunque?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
   setCfg_('Stato', 'APERTA');
-  SpreadsheetApp.getUi().alert('Votazione APERTA. Non modificare i nomi dei candidati finché è in corso.');
+  ui.alert('Votazione APERTA — posti da assegnare: ' + posti + ', max preferenze per scheda: ' + maxPref_(cfg_(), n) + '.\nNon modificare candidati e società finché è in corso.');
 }
 
 function chiudiVotazione() {
@@ -129,7 +132,7 @@ function calcolaRisultati() {
   const lista = cand.map(x => ({ nome: x.nome, anni: x.anni, voti: voti[x.nome] }))
     .sort((a, b) => b.voti - a.voti || b.anni - a.anni || a.nome.localeCompare(b.nome, 'it'));
 
-  const posti = parseInt(c['Numero eletti'], 10) || 0;
+  const posti = posti_(c);
   const out = [];
   let i = 0;
   while (i < lista.length) {
@@ -151,11 +154,11 @@ function calcolaRisultati() {
   const sh = sheet_(SH.RIS);
   sh.getRange(2, 1, Math.max(sh.getMaxRows() - 1, 1), 6).clearContent();
   if (out.length) sh.getRange(2, 1, out.length, 6).setValues(out);
-  const aventi = sheet_(SH.COD).getLastRow() - 1;
   const riepilogo = [
     ['', '', '', '', '', ''],
     ['Riepilogo', '', '', '', '', ''],
-    ['Società aventi diritto', Math.max(aventi, 0), '', '', '', ''],
+    ['Società aventi diritto', numSocieta_(), '', '', '', ''],
+    ['Commissari da eleggere', posti, cand.length < posti ? 'ATTENZIONE: candidati insufficienti' : '', '', '', ''],
     ['Schede votate', schede.length, '', '', '', ''],
     ['di cui bianche', bianche, '', '', '', ''],
     ['Preferenze espresse', totPref, '', '', '', ''],
@@ -200,7 +203,8 @@ function getInfo() {
     messaggio: String(c['Messaggio'] || ''),
     aperta: aperta_(c),
     candidati: cand.map(x => x.nome),
-    max: maxPref_(c, cand.length)
+    max: maxPref_(c, cand.length),
+    eletti: posti_(c)
   };
 }
 
@@ -277,6 +281,23 @@ function candidati_() {
 function maxPref_(c, n) {
   const v = parseInt(c['Max preferenze'], 10);
   return v > 0 ? Math.min(v, n) : Math.ceil(n / 2);
+}
+
+/**
+ * Numero di eletti. Se "Numero eletti" è compilato vale quello (es. 2 per
+ * Responsabile + vice); altrimenti regola CTL: metà delle società
+ * partecipanti arrotondata per eccesso, minimo 3, massimo 6.
+ */
+function posti_(c) {
+  const v = parseInt(c['Numero eletti'], 10);
+  if (v > 0) return v;
+  return Math.min(6, Math.max(3, Math.ceil(numSocieta_() / 2)));
+}
+
+function numSocieta_() {
+  const sh = sheet_(SH.COD);
+  if (sh.getLastRow() < 2) return 0;
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues().filter(r => String(r[0]).trim()).length;
 }
 
 function norm_(c) { return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }

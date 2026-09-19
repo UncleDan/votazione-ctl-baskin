@@ -1,4 +1,4 @@
-# Votazione CTL — istruzioni (v1)
+# Votazione CTL — istruzioni (v2)
 
 Voto online anonimo, una scheda per società, utilizzabile da telefono senza account Google.
 
@@ -20,7 +20,10 @@ Voto online anonimo, una scheda per società, utilizzabile da telefono senza acc
 1. Foglio **Candidati**: un nome per riga (in ordine alfabetico, così appaiono sulla scheda) e, nella colonna B, gli anni di tesseramento/incarichi per lo spareggio.
 2. Foglio **Codici**: il nome di ogni società avente diritto nella colonna A.
 3. **🗳️ Votazione → 2. Genera codici e link**: ogni società riceve un codice e un link personale (il link apre la scheda già col codice).
-4. Foglio **Config**: titolo, numero di eletti. "Max preferenze" vuoto = metà dei candidati arrotondata per eccesso (come da regolamento).
+4. Foglio **Config**: titolo. Lascia vuoti "Numero eletti" e "Max preferenze" per applicare il regolamento:
+   - commissari da eleggere = metà delle società elencate in *Codici*, arrotondata per eccesso, minimo 3 e massimo 6;
+   - preferenze per scheda = metà dei candidati, arrotondata per eccesso.
+   Il foglio *Codici* deve quindi contenere **tutte e sole** le società partecipanti al campionato locale.
 5. Invia a ciascun referente di società il **suo** link o codice (mail o messaggio privato).
 
 ## Durante e dopo
@@ -37,9 +40,11 @@ Voto online anonimo, una scheda per società, utilizzabile da telefono senza acc
 
 ## Elezione di Responsabile e vice CTL
 
-Usa lo stesso strumento con un **nuovo foglio** (o "Azzera votazione"): in *Candidati* i membri della CTL, in *Codici* un codice per ogni membro (colonna Società = nome del membro), *Max preferenze* = 1. Il regolamento non specifica se il vice sia il secondo classificato o una votazione separata: in caso di dubbio fai due votazioni distinte.
+Usa lo stesso strumento con un **nuovo foglio** (o "Azzera votazione"): in *Candidati* i membri della CTL, in *Codici* un codice per ogni membro (colonna Società = nome del membro), *Max preferenze* = 1 e *Numero eletti* compilato a mano (es. 2). Il regolamento non specifica se il vice sia il secondo classificato o una votazione separata: in caso di dubbio fai due votazioni distinte.
 
 ## Note
+
+- Se il foglio era stato creato con la v1, aggiorna a mano la nota di "Numero eletti" in *Config*: il comportamento vale comunque.
 
 - Non rinominare i candidati a votazione aperta.
 - Un codice smarrito: cancellalo nel foglio *Codici* e rigenera (solo se quella società non ha ancora votato).

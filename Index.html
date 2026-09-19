@@ -115,7 +115,7 @@
   }
 
   function costruisci() {
-    $('messaggio').textContent = INFO.messaggio;
+    $('messaggio').textContent = (INFO.eletti ? 'Posti da assegnare: ' + INFO.eletti + '. ' : '') + INFO.messaggio;
     var lista = $('lista');
     lista.innerHTML = '';
     INFO.candidati.forEach(function (nome, i) {
