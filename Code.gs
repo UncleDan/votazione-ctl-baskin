@@ -1,6 +1,6 @@
 /**
  * Votazione CTL Baskin — voto online anonimo, un voto per squadra
- * v5 — Google Apps Script legato a un Foglio Google
+ * v6 — Google Apps Script legato a un Foglio Google
  *
  * Codice sorgente: https://github.com/UncleDan/votazione-ctl-baskin
  * Copyright (c) 2026 Daniele Lolli (UncleDan) — Licenza MIT (vedi LICENSE)
@@ -25,6 +25,7 @@ const SH = {
   COM: 'Commissari', RP: 'Risultati Presidente', RV: 'Risultati Vice', REP: 'Report', URNA: 'Riepilogo urna'
 };
 const REPO_URL = 'https://github.com/UncleDan/votazione-ctl-baskin';
+const VERSIONE = 'v6';
 const P_SALT = 'SALT';
 const ROUND = {
   1: { nome: 'Commissari CTL', ballots: 'BALLOTS', used: 'USED' },
@@ -83,6 +84,7 @@ function setup() {
     ['Parametro', 'Valore', 'Note'],
     ['Titolo', 'Elezione CTL Baskin', 'Titolo della pagina di voto'],
     ['Sezione territoriale', '', 'Es. Emilia-Romagna — compare sulla pagina di voto e nei report'],
+    ['Anno sportivo', '', 'Testo libero, es. 2026/2027 — compare sulla pagina di voto e nei report'],
     ['Stato', 'CHIUSA', 'APERTA / CHIUSA — usa il menu'],
     ['Max preferenze', '', 'Vuoto = metà dei candidati arrotondata per eccesso'],
     ['Numero eletti', '', 'Vuoto = regola CTL: metà delle squadre per eccesso, min 3, max 6'],
@@ -91,6 +93,8 @@ function setup() {
   ]);
   ensureCfgRow_('Max aiuti allenatore', 1, 'Deroga: aiuti allenatore ammessi, solo se mancano allenatori/autocandidature');
   ensureCfgRow_('Sezione territoriale', '', 'Es. Emilia-Romagna — compare sulla pagina di voto e nei report');
+  ensureCfgRow_('Anno sportivo', '', 'Testo libero, es. 2026/2027 — compare sulla pagina di voto e nei report');
+  cfgCell_('Anno sportivo').setNumberFormat('@');  // testo: evita che "2026/27" diventi una data
   ensureCfgRow_('Round attivo', 1, 'Gestito dal menu (1 commissari, 2 presidente, 3 vice)');
   ensureCfgRow_('Formatore di riferimento', '', 'Nome, senza votazione. Se vuole essere votante va inserito anche tra i Candidati come Autocandidatura');
   ensureCfgRow_('Presidente', '', 'Compilato dal round 2; in caso di parità scrivilo a mano');
@@ -317,6 +321,7 @@ function calcolaRisultati() {
     r('', ''),
     r('Riepilogo', ''),
     r('Sezione territoriale', sezione_(c)),
+    r('Anno sportivo', anno_(c)),
     r('Squadre aventi diritto', numSquadre_()),
     r('Schede votate', schede.length),
     r('di cui bianche', bianche),
@@ -328,6 +333,7 @@ function calcolaRisultati() {
     r('Calcolato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm'))
   ];
   sh.getRange(out.length + 2, 1, riepilogo.length, RIS_HEADER.length).setValues(riepilogo);
+  scriviLinkRepo_(sh, out.length + 2 + riepilogo.length + 1);
   sh.autoResizeColumns(1, RIS_HEADER.length);
   sh.activate();
   aggiornaReport();
@@ -371,11 +377,12 @@ function calcolaCarica_(r) {
   sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold').setBackground('#e8eaf6');
   sh.getRange(2, 1, out.length, head.length).setValues(out);
   const f = (a, b) => [a, b, '', '', '', '', ''];
-  const riep = [f('', ''), f('Riepilogo', ''), f('Sezione territoriale', sezione_(c)),
+  const riep = [f('', ''), f('Riepilogo', ''), f('Sezione territoriale', sezione_(c)), f('Anno sportivo', anno_(c)),
     f('Commissari aventi diritto', Object.keys(votantiMap_(r)).length),
     f('Schede votate', schede.length), f('di cui bianche', bianche),
     f('Calcolato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm'))];
   sh.getRange(out.length + 2, 1, riep.length, head.length).setValues(riep);
+  scriviLinkRepo_(sh, out.length + 2 + riep.length + 1);
   sh.autoResizeColumns(1, head.length);
   sh.activate();
 
@@ -410,8 +417,9 @@ function aggiornaReport() {
 
   const R = (a, b, c3, d) => [a, b || '', c3 || '', d || ''];
   const rows = [
-    R(String(c['Titolo'] || 'Elezione CTL') + (sezione_(c) ? ' — Sezione territoriale ' + sezione_(c) : '') + ' — Report'),
+    R(String(c['Titolo'] || 'Elezione CTL') + (intestazione_(c) ? ' — ' + intestazione_(c) : '') + ' — Report'),
     R('Sezione territoriale', sezione_(c) || '(non indicata)'),
+    R('Anno sportivo', anno_(c) || '(non indicato)'),
     R('Aggiornato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm')),
     R(''),
     R('Presidente', pres || '(da eleggere)'),
@@ -431,8 +439,8 @@ function aggiornaReport() {
 
   sh.getRange(1, 1, rows.length, 4).setValues(rows);
   sh.getRange(1, 1).setFontWeight('bold').setFontSize(14);
-  sh.getRange(5, 1, 4, 1).setFontWeight('bold');
-  sh.getRange(rows.length + 2, 1).setValue('Codice sorgente aperto (licenza MIT): ' + REPO_URL).setFontSize(9);
+  sh.getRange(6, 1, 4, 1).setFontWeight('bold');
+  scriviLinkRepo_(sh, rows.length + 2);
   sh.getRange(headRow, 1, 1, 4).setFontWeight('bold').setBackground('#e8eaf6');
   sh.autoResizeColumns(1, 4);
 }
@@ -506,6 +514,7 @@ function aggiornaUrna() {
 
   push(R('Riepilogo per il custode dell\'urna — ' + String(c['Titolo'] || 'Elezione CTL')), 'b');
   push(R('Sezione territoriale', sezione_(c) || '(non indicata)'));
+  push(R('Anno sportivo', anno_(c) || '(non indicato)'));
   push(R('Aggiornato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm')));
   push(R('Stato', 'Round ' + roundAttivo_(c) + ' – ' + ROUND[roundAttivo_(c)].nome + ': ' + (aperta_(c) ? 'APERTO' : 'CHIUSO')));
 
@@ -547,9 +556,9 @@ function aggiornaUrna() {
 
   push(R(''));
   push(R('Le schede non contengono né codice, né votante, né orario: l\'ordine è casuale e non corrisponde all\'ordine di voto.'));
-  push(R('Codice sorgente aperto (licenza MIT): ' + REPO_URL));
 
   sh.getRange(1, 1, rows.length, W).setValues(rows);
+  scriviLinkRepo_(sh, rows.length + 1);
   sh.getRange(1, 1).setFontSize(14);
   bold.forEach(i => sh.getRange(i, 1, 1, W).setFontWeight('bold'));
   head.forEach(i => sh.getRange(i, 1, 1, W).setFontWeight('bold').setBackground('#e8eaf6'));
@@ -597,6 +606,8 @@ function azzeraRound() {
 function doGet(e) {
   const t = HtmlService.createTemplateFromFile('Index');
   t.codice = (e && e.parameter && e.parameter.c) || '';
+  t.repo = REPO_URL;
+  t.versione = VERSIONE;
   return t.evaluate()
     .setTitle(cfg_()['Titolo'] || 'Votazione')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -610,6 +621,7 @@ function getInfo() {
   return {
     round: r,
     sezione: sezione_(c),
+    intestazione: intestazione_(c),
     repo: REPO_URL,
     titolo: r === 1 ? titolo : titolo + ' — ' + ROUND[r].nome,
     sottotitolo: r === 1 ? 'Voto anonimo — una scheda per squadra' : 'Voto anonimo — una scheda per commissario',
@@ -691,6 +703,33 @@ function setCfg_(key, val) {
 }
 
 function sezione_(c) { return String(c['Sezione territoriale'] || '').trim(); }
+
+function anno_(c) {
+  const v = c['Anno sportivo'];
+  if (v instanceof Date) return Utilities.formatDate(v, 'Europe/Rome', 'yyyy/MM');
+  return String(v || '').trim();
+}
+
+/** "Sezione territoriale X · Anno sportivo Y" (solo le parti compilate). */
+function intestazione_(c) {
+  return [sezione_(c) ? 'Sezione territoriale ' + sezione_(c) : '', anno_(c) ? 'Anno sportivo ' + anno_(c) : '']
+    .filter(Boolean).join(' · ');
+}
+
+/** Riga con link cliccabile al codice sorgente, per trasparenza. */
+function scriviLinkRepo_(sh, riga) {
+  const testo = 'Codice sorgente aperto e verificabile (licenza MIT, versione ' + VERSIONE + '): ' + REPO_URL;
+  const rt = SpreadsheetApp.newRichTextValue().setText(testo)
+    .setLinkUrl(testo.length - REPO_URL.length, testo.length, REPO_URL).build();
+  sh.getRange(riga, 1).setRichTextValue(rt).setFontSize(9);
+}
+
+function cfgCell_(key) {
+  const sh = sheet_(SH.CONFIG);
+  const keys = sh.getRange(1, 1, sh.getLastRow(), 1).getValues();
+  const i = keys.findIndex(r => String(r[0]).trim() === key);
+  return sh.getRange(i >= 0 ? i + 1 : sh.getLastRow() + 1, 2);
+}
 
 function aperta_(c) { return String(c['Stato']).trim().toUpperCase() === 'APERTA'; }
 

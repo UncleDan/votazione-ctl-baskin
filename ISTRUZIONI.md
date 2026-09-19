@@ -1,4 +1,4 @@
-# Votazione CTL Baskin — istruzioni (v5)
+# Votazione CTL Baskin — istruzioni (v6)
 
 Voto online anonimo in tre round, utilizzabile da telefono senza account Google:
 
@@ -10,7 +10,7 @@ Voto online anonimo in tre round, utilizzabile da telefono senza account Google:
 
 Il **Formatore di riferimento** non si vota: si indica in *Config*.
 
-Codice sorgente aperto: <https://github.com/UncleDan/votazione-ctl-baskin> (licenza MIT). Il link compare anche in fondo alla pagina di voto, così chiunque può verificare come funziona.
+Codice sorgente aperto: <https://github.com/UncleDan/votazione-ctl-baskin> (licenza MIT). Per trasparenza il link diretto e cliccabile al repository, con il numero di versione, compare in fondo alla pagina di voto e in tutti i fogli di resoconto (*Risultati*, *Risultati Presidente*, *Risultati Vice*, *Report*, *Riepilogo urna*).
 
 ## Installazione (una volta)
 
@@ -25,7 +25,7 @@ Codice sorgente aperto: <https://github.com/UncleDan/votazione-ctl-baskin> (lice
 
 1. *Squadre*: una riga per squadra avente diritto (una riga = un voto).
 2. *Candidati*: nome, **Qualifica** (Allenatore / Aiuto allenatore / Autocandidatura), **Squadra**, anni per lo spareggio.
-3. *Config*: compila **Sezione territoriale** (es. Emilia-Romagna: compare sulla pagina di voto, nei risultati, nel report e nel riepilogo urna); lascia vuoti "Numero eletti" e "Max preferenze" per applicare il regolamento (commissari = metà delle squadre per eccesso, min 3, max 6). "Max aiuti allenatore" = 1.
+3. *Config*: compila **Sezione territoriale** (es. Emilia-Romagna) e **Anno sportivo** (testo libero, es. 2026/2027): compaiono sulla pagina di voto, nei risultati, nel report e nel riepilogo urna. Lascia vuoti "Numero eletti" e "Max preferenze" per applicare il regolamento (commissari = metà delle squadre per eccesso, min 3, max 6). "Max aiuti allenatore" = 1.
 4. **Round 1 → Genera codici e link squadre**, invia a ogni squadra il suo link.
 5. **Round 1 → Apri**, poi **Chiudi**, poi **Calcola risultati**.
 

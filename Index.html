@@ -30,7 +30,7 @@
   .note { color:var(--muted); font:13px/1.4 system-ui, sans-serif; margin-top:18px; }
   .sez { font:600 14px system-ui, sans-serif; color:var(--accent); margin:0 0 6px; }
   footer { max-width:520px; margin:0 auto; padding:0 14px 30px; color:var(--muted); font:12px/1.5 system-ui, sans-serif; text-align:center; }
-  footer a { color:var(--muted); }
+  footer a { color:var(--accent); word-break:break-all; }
 </style>
 </head>
 <body>
@@ -79,8 +79,9 @@
   </div>
 </main>
 <footer>
-  Codice sorgente aperto, verificabile da chiunque:<br>
-  <a href="https://github.com/UncleDan/votazione-ctl-baskin" target="_blank" rel="noopener">github.com/UncleDan/votazione-ctl-baskin</a> · licenza MIT
+  Per trasparenza il codice di questo sistema è pubblico e verificabile da chiunque:<br>
+  <a href="<?= repo ?>" target="_blank" rel="noopener"><?= repo ?></a><br>
+  licenza MIT · versione <?= versione ?>
 </footer>
 
 <script>
@@ -99,7 +100,7 @@
       INFO = i;
       $('titolo').textContent = i.titolo;
       $('sub').textContent = i.sottotitolo;
-      if (i.sezione) { $('sezione').textContent = 'Sezione territoriale ' + i.sezione; $('sezione').hidden = false; }
+      if (i.intestazione) { $('sezione').textContent = i.intestazione; $('sezione').hidden = false; }
       if (!i.aperta) return show('s-closed');
       show('s-code');
       if ($('codice').value.trim()) verifica();

@@ -1,5 +1,9 @@
 # Changelog
 
+## v6
+- Link diretto e cliccabile al repository, con numero di versione, in fondo alla pagina di voto e in tutti i fogli di resoconto (Risultati, Risultati Presidente, Risultati Vice, Report, Riepilogo urna).
+- Parametro "Anno sportivo" (testo libero) sulla pagina di voto e nei resoconti.
+
 ## v5
 - Parametro "Sezione territoriale" sulla pagina di voto, nei risultati, nel report e nel riepilogo urna.
 - Foglio "Riepilogo urna" per il custode: partecipazione, controllo schede = codici usati, preferenze, schede anonime (conteggi nascosti a round aperto).

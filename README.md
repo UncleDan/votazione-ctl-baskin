@@ -10,7 +10,8 @@ Funziona con un Foglio Google e Google Apps Script: nessun server da gestire, ne
 - **Round 2 – Presidente** e **Round 3 – Vice**: i commissari eletti votano con un link personale, a maggioranza semplice.
 - **Formatore di riferimento** indicato senza votazione (votante solo se candidato come Autocandidatura).
 - **Report** finale e **Riepilogo urna** per il custode, con controllo di coerenza e schede anonime per il riconteggio.
-- Nome della **sezione territoriale** sulla pagina di voto e nei report.
+- **Sezione territoriale** e **anno sportivo** sulla pagina di voto e nei report.
+- Link diretto al codice sorgente, con numero di versione, sulla pagina di voto e in tutti i resoconti, per trasparenza.
 
 ## Anonimato
 
