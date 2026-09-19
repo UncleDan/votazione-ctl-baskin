@@ -1,5 +1,12 @@
 # Changelog
 
+## v7
+- Voto per **società**: nuovo foglio "Società" (codici e link) e foglio "Squadre" con squadra → società; commissari = metà delle società. Migrazione automatica dalla v6.
+- **Ballottaggi** per parità non risolvibili (pari preferenze e pari anni) su round 1, Presidente e Vice: fino a 3, a voto multiplo tra i soli candidati pari, nuovi link a ogni ballottaggio; foglio "Risultati ballottaggi"; ballottaggi inclusi nel Riepilogo urna e nel Report.
+- "Sezione Territoriale" con le maiuscole (parametro rinominato automaticamente).
+- Nota "precedenza per anni" solo su chi effettivamente precede.
+- Cartella `test/` con mock di Apps Script e simulazione completa.
+
 ## v6
 - Link diretto e cliccabile al repository, con numero di versione, in fondo alla pagina di voto e in tutti i fogli di resoconto (Risultati, Risultati Presidente, Risultati Vice, Report, Riepilogo urna).
 - Parametro "Anno sportivo" (testo libero) sulla pagina di voto e nei resoconti.

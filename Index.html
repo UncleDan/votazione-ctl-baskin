@@ -38,7 +38,7 @@
   <div class="scheda">
     <p class="sez" id="sezione" hidden></p>
     <h1 id="titolo">Votazione</h1>
-    <p class="sub" id="sub">Voto anonimo — una scheda per squadra</p>
+    <p class="sub" id="sub">Voto anonimo — una scheda per società</p>
 
     <section id="s-load"><p>Caricamento…</p></section>
 
@@ -185,7 +185,7 @@
         show('s-done');
       })
       .withFailureHandler(fail('m-invio'))
-      .inviaVoto(CODE, scelte(), INFO.round);
+      .inviaVoto(CODE, scelte(), INFO.ctx);
   }
 
   $('b-verifica').addEventListener('click', verifica);
