@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<style>
+  :root { --ink:#1d2433; --muted:#5b6475; --paper:#fbfaf6; --line:#d9d4c7; --accent:#1f4e8c; --ok:#1e7a45; --err:#b3261e; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#ecebe5; color:var(--ink); font:17px/1.5 "Georgia", "Times New Roman", serif; }
+  main { max-width:520px; margin:0 auto; padding:18px 14px 40px; }
+  .scheda { background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:22px 18px; box-shadow:0 2px 0 var(--line); }
+  h1 { font-size:1.35rem; line-height:1.25; margin:0 0 4px; }
+  .sub { color:var(--muted); font:14px/1.4 system-ui, sans-serif; margin:0 0 18px; }
+  p { margin:0 0 14px; }
+  label.f { display:block; font:600 14px system-ui, sans-serif; margin-bottom:6px; }
+  input[type=text] { width:100%; font:600 22px ui-monospace, Menlo, monospace; letter-spacing:2px; text-transform:uppercase;
+    padding:12px; border:2px solid var(--line); border-radius:6px; background:#fff; }
+  input[type=text]:focus { outline:none; border-color:var(--accent); }
+  button { width:100%; font:600 17px system-ui, sans-serif; padding:14px; border:0; border-radius:6px; background:var(--accent); color:#fff; margin-top:14px; cursor:pointer; }
+  button.sec { background:transparent; color:var(--accent); border:2px solid var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  .msg { font:15px system-ui, sans-serif; color:var(--err); margin-top:10px; min-height:1em; }
+  .cont { position:sticky; top:0; background:var(--paper); padding:8px 0; font:600 15px system-ui, sans-serif; border-bottom:1px solid var(--line); margin-bottom:6px; z-index:1; }
+  .cand { display:flex; align-items:center; gap:14px; padding:14px 6px; border-bottom:1px dashed var(--line); cursor:pointer; }
+  .cand input { width:26px; height:26px; accent-color:var(--accent); flex:none; }
+  .cand.off { opacity:.45; }
+  ul.r { padding-left:20px; margin:0 0 10px; }
+  .ok { color:var(--ok); font-size:3rem; line-height:1; margin-bottom:8px; }
+  .note { color:var(--muted); font:13px/1.4 system-ui, sans-serif; margin-top:18px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="scheda">
+    <h1 id="titolo">Votazione</h1>
+    <p class="sub" id="sub">Voto anonimo — una scheda per società</p>
+
+    <section id="s-load"><p>Caricamento…</p></section>
+
+    <section id="s-closed" hidden><p>La votazione al momento non è aperta.</p></section>
+
+    <section id="s-code" hidden>
+      <label class="f" for="codice">Codice della società</label>
+      <input type="text" id="codice" autocomplete="off" autocapitalize="characters" spellcheck="false"
+             placeholder="XXXX-XXXX" value="<?= codice ?>">
+      <button id="b-verifica">Continua</button>
+      <div class="msg" id="m-code"></div>
+      <p class="note">Il codice serve solo a garantire un voto per società: la scheda viene registrata senza codice, senza nome e senza orario.</p>
+    </section>
+
+    <section id="s-vote" hidden>
+      <p id="soc"></p>
+      <p id="messaggio"></p>
+      <div class="cont" id="contatore"></div>
+      <div id="lista"></div>
+      <button id="b-riepilogo">Rivedi la scheda</button>
+    </section>
+
+    <section id="s-confirm" hidden>
+      <p><strong>Controlla prima di inviare.</strong> Dopo l'invio il voto non si può modificare.</p>
+      <div id="riep"></div>
+      <button id="b-invia">Invia il voto</button>
+      <button class="sec" id="b-indietro">Modifica</button>
+      <div class="msg" id="m-invio"></div>
+    </section>
+
+    <section id="s-done" hidden>
+      <div class="ok">✓</div>
+      <p><strong>Voto registrato.</strong></p>
+      <p id="done-soc"></p>
+      <p class="note">Puoi chiudere questa pagina.</p>
+    </section>
+  </div>
+</main>
+
+<script>
+  var INFO = null, CODE = '';
+  var $ = function (id) { return document.getElementById(id); };
+  var SEZ = ['s-load', 's-closed', 's-code', 's-vote', 's-confirm', 's-done'];
+  function show(id) { SEZ.forEach(function (x) { $(x).hidden = (x !== id); }); window.scrollTo(0, 0); }
+  function fail(el) { return function (e) { busy(false); $(el).textContent = 'Errore di connessione, riprova. (' + (e && e.message || e) + ')'; }; }
+  function busy(b) { ['b-verifica', 'b-invia', 'b-indietro'].forEach(function (id) { $(id).disabled = b; }); }
+  function scelte() {
+    return Array.prototype.slice.call(document.querySelectorAll('#lista input:checked')).map(function (i) { return i.value; });
+  }
+
+  google.script.run
+    .withSuccessHandler(function (i) {
+      INFO = i;
+      $('titolo').textContent = i.titolo;
+      if (!i.aperta) return show('s-closed');
+      show('s-code');
+      if ($('codice').value.trim()) verifica();
+    })
+    .withFailureHandler(function (e) { $('s-load').textContent = 'Impossibile caricare la votazione: ' + (e && e.message || e); })
+    .getInfo();
+
+  function verifica() {
+    var c = $('codice').value.trim();
+    $('m-code').textContent = '';
+    if (!c) { $('m-code').textContent = 'Inserisci il codice.'; return; }
+    busy(true);
+    google.script.run
+      .withSuccessHandler(function (r) {
+        busy(false);
+        if (!r.ok) { $('m-code').textContent = r.err; return; }
+        CODE = c;
+        $('soc').textContent = 'Stai votando per: ' + r.societa;
+        $('done-soc').textContent = r.societa;
+        costruisci();
+        show('s-vote');
+      })
+      .withFailureHandler(fail('m-code'))
+      .verificaCodice(c);
+  }
+
+  function costruisci() {
+    $('messaggio').textContent = INFO.messaggio;
+    var lista = $('lista');
+    lista.innerHTML = '';
+    INFO.candidati.forEach(function (nome, i) {
+      var l = document.createElement('label');
+      l.className = 'cand';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = nome; cb.id = 'c' + i;
+      cb.addEventListener('change', aggiorna);
+      var s = document.createElement('span');
+      s.textContent = nome;
+      l.appendChild(cb); l.appendChild(s);
+      lista.appendChild(l);
+    });
+    aggiorna();
+  }
+
+  function aggiorna() {
+    var n = scelte().length, pieno = n >= INFO.max;
+    $('contatore').textContent = 'Preferenze: ' + n + ' su massimo ' + INFO.max;
+    document.querySelectorAll('#lista input').forEach(function (cb) {
+      cb.disabled = pieno && !cb.checked;
+      cb.parentNode.classList.toggle('off', cb.disabled);
+    });
+  }
+
+  function riepilogo() {
+    var s = scelte(), r = $('riep');
+    r.innerHTML = '';
+    if (!s.length) {
+      r.innerHTML = '<p><strong>Scheda bianca</strong> (nessuna preferenza).</p>';
+    } else {
+      var p = document.createElement('p');
+      p.textContent = s.length === 1 ? '1 preferenza:' : s.length + ' preferenze:';
+      var ul = document.createElement('ul'); ul.className = 'r';
+      s.forEach(function (x) { var li = document.createElement('li'); li.textContent = x; ul.appendChild(li); });
+      r.appendChild(p); r.appendChild(ul);
+    }
+    $('m-invio').textContent = '';
+    show('s-confirm');
+  }
+
+  function invia() {
+    busy(true);
+    google.script.run
+      .withSuccessHandler(function (r) {
+        busy(false);
+        if (!r.ok) { $('m-invio').textContent = r.err; return; }
+        CODE = '';
+        show('s-done');
+      })
+      .withFailureHandler(fail('m-invio'))
+      .inviaVoto(CODE, scelte());
+  }
+
+  $('b-verifica').addEventListener('click', verifica);
+  $('codice').addEventListener('keydown', function (e) { if (e.key === 'Enter') verifica(); });
+  $('b-riepilogo').addEventListener('click', riepilogo);
+  $('b-indietro').addEventListener('click', function () { show('s-vote'); });
+  $('b-invia').addEventListener('click', invia);
+</script>
+</body>
+</html>
