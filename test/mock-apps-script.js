@@ -23,14 +23,15 @@ Sheet.prototype = {
       clearContent() { for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) { const row = sh.d[r - 1 + i]; if (row && row.length >= c + j) row[c - 1 + j] = ''; } return R; },
       setRichTextValue(v) { sh.cell(r, c)[c - 1] = v.text; return R; },
       setFontWeight() { return R; }, setBackground() { return R; }, setFontSize() { return R; },
-      setDataValidation() { return R; }, setNumberFormat() { return R; }
+      setDataValidation() { return R; }, setNumberFormat() { return R; },
+      setFormula(f) { sh.cell(r, c)[c - 1] = f; return R; }
     };
     return R;
   },
   appendRow(a) { this.d.splice(this.getLastRow(), 0, a.slice()); },
   clearContents() { this.d = []; }, clear() { this.d = []; },
   insertColumnsAfter(c, n) { this.d.forEach(r => { while (r.length < c) r.push(''); r.splice(c, 0, ...Array(n).fill('')); }); },
-  setFrozenRows() {}, autoResizeColumns() {}, activate() {}
+  setFrozenRows() {}, autoResizeColumns() {}, activate() {}, setRowHeight() {}, setRowHeights() {}
 };
 
 const SS = {

@@ -27,7 +27,8 @@ Le schede sono salvate senza codice, votante né orario, in posizione casuale, f
 | `ISTRUZIONI.md` | installazione e uso passo per passo |
 | `CHANGELOG.md` | storico delle versioni |
 | `test/` | mock di Apps Script e simulazione completa (`node test/simulazione.js`) |
-| `LICENSE` | licenza MIT |
+| `LICENSE` | licenza MIT (codice) |
+| `NOTICE` | avvisi di copyright e proprietà del logo EISI |
 
 ## Installazione rapida
 
@@ -38,9 +39,15 @@ Le schede sono salvate senza codice, votante né orario, in posizione casuale, f
 
 Dettagli in [ISTRUZIONI.md](ISTRUZIONI.md).
 
+## Logo
+
+La pagina di voto e i resoconti mostrano il logo di Ente Italiano Sport Inclusivi, caricato in **hotlinking** dal sito eisi.it (SVG per la pagina web, PNG per i fogli Google, che non visualizzano SVG). Gli indirizzi si cambiano o si svuotano in *Config*.
+
 ## Licenza e citazione
 
 Rilasciato con **licenza MIT**: puoi usarlo, modificarlo, ridistribuirlo e riutilizzarlo anche per altre discipline o scopi commerciali, a condizione di **mantenere l'avviso di copyright e il testo della licenza** in tutte le copie o parti sostanziali.
+
+**Il logo EISI è di proprietà di Ente Italiano Sport Inclusivi**: non è coperto dalla licenza MIT, non è incluso nel repository e per usarlo serve l'autorizzazione di EISI (dettagli in [NOTICE](NOTICE)).
 
 Se lo usi o lo adatti, cita il progetto originale:
 

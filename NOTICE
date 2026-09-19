@@ -1,0 +1,19 @@
+Votazione CTL Baskin
+Copyright (c) 2026 Daniele Lolli (UncleDan)
+https://github.com/UncleDan/votazione-ctl-baskin
+
+Il codice sorgente di questo progetto è distribuito con licenza MIT (vedi LICENSE).
+
+LOGO E MARCHI DI TERZI
+Il logo EISI (Ente Italiano Sport Inclusivi — Ente di Promozione Paralimpica
+riconosciuto dal Comitato Italiano Paralimpico) è di proprietà esclusiva di
+Ente Italiano Sport Inclusivi, che ne detiene tutti i diritti.
+Il logo NON è coperto dalla licenza MIT, non è incluso in questo repository e
+viene visualizzato esclusivamente tramite collegamento (hotlinking) agli
+indirizzi pubblicati da EISI:
+  https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg
+  https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png
+Chi riutilizza o adatta questo software non acquisisce alcun diritto sul logo
+e sui marchi EISI: per usarli occorre l'autorizzazione di Ente Italiano Sport
+Inclusivi. In caso contrario, rimuovere o sostituire il logo tramite i
+parametri "Logo pagina web" e "Logo fogli (PNG)" del foglio Config.

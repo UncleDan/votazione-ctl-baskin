@@ -28,6 +28,7 @@
   ul.r { padding-left:20px; margin:0 0 10px; }
   .ok { color:var(--ok); font-size:3rem; line-height:1; margin-bottom:8px; }
   .note { color:var(--muted); font:13px/1.4 system-ui, sans-serif; margin-top:18px; }
+  .logo { display:block; height:96px; width:auto; max-width:100%; margin:0 auto 14px; }
   .sez { font:600 14px system-ui, sans-serif; color:var(--accent); margin:0 0 6px; }
   footer { max-width:520px; margin:0 auto; padding:0 14px 30px; color:var(--muted); font:12px/1.5 system-ui, sans-serif; text-align:center; }
   footer a { color:var(--accent); word-break:break-all; }
@@ -36,6 +37,7 @@
 <body>
 <main>
   <div class="scheda">
+    <? if (logo) { ?><img class="logo" src="<?= logo ?>" alt="Ente Italiano Sport Inclusivi" onerror="this.remove()"><? } ?>
     <p class="sez" id="sezione" hidden></p>
     <h1 id="titolo">Votazione</h1>
     <p class="sub" id="sub">Voto anonimo — una scheda per società</p>
@@ -82,6 +84,7 @@
   Per trasparenza il codice di questo sistema è pubblico e verificabile da chiunque:<br>
   <a href="<?= repo ?>" target="_blank" rel="noopener"><?= repo ?></a><br>
   licenza MIT · versione <?= versione ?>
+  <? if (logo) { ?><br><?= proprietaLogo ?><? } ?>
 </footer>
 
 <script>

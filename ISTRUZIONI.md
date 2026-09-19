@@ -1,4 +1,4 @@
-# Votazione CTL Baskin — istruzioni (v7)
+# Votazione CTL Baskin — istruzioni (v8)
 
 Voto online anonimo, utilizzabile da telefono senza account Google:
 
@@ -12,6 +12,17 @@ Voto online anonimo, utilizzabile da telefono senza account Google:
 Il **Formatore di riferimento** non si vota: si indica in *Config*.
 
 Codice sorgente aperto: <https://github.com/UncleDan/votazione-ctl-baskin> (licenza MIT). Per trasparenza il link diretto e cliccabile, con il numero di versione, compare in fondo alla pagina di voto e in tutti i fogli di resoconto.
+
+## Logo
+
+Il logo di Ente Italiano Sport Inclusivi è caricato in **hotlinking** (non è nel foglio né nel codice):
+
+- pagina di voto: `https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg`
+- resoconti nei fogli: `https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png` — i fogli Google (funzione IMAGE) **non visualizzano SVG**, quindi va caricata sul sito anche la versione PNG.
+
+Gli indirizzi sono in *Config* ("Logo pagina web", "Logo fogli (PNG)"): lasciandoli vuoti il logo non compare. Nei fogli *Report*, *Riepilogo urna* e *Risultati ballottaggi* il logo è in testa; nei fogli tabellari (*Risultati*, *Risultati Presidente*, *Risultati Vice*) è nel piede, per non spostare le intestazioni delle colonne.
+
+Il logo è di proprietà di Ente Italiano Sport Inclusivi e non è coperto dalla licenza MIT (vedi `NOTICE`).
 
 ## Installazione (una volta)
 

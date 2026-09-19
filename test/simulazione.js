@@ -144,5 +144,12 @@ verifica(balState_(3).stato === 'irrisolto' && cfg_()['Vice'] === '', 'dopo 3 ba
 preparaBallottaggio();
 verifica(/manualmente/.test(M.alerts[M.alerts.length - 1]), 'un quarto ballottaggio non è consentito');
 
+console.log('\n=== Logo');
+['Report', 'Riepilogo urna', 'Risultati ballottaggi'].forEach(n =>
+  verifica(/^=IMAGE\("https:\/\/eisi\.it\/.*\.png", 1\)$/.test(foglio(n).d[0][0]), 'logo in testa al foglio "' + n + '"'));
+['Risultati', 'Risultati Presidente', 'Risultati Vice'].forEach(n =>
+  verifica(foglio(n).d.some(r => /^=IMAGE\(/.test(r[0])), 'logo nel piede del foglio "' + n + '"'));
+verifica(foglio('Report').d.some(r => /Ente Italiano Sport Inclusivi/.test(r[0])), 'nota di proprietà del logo nei resoconti');
+
 console.log('\n' + (errori ? errori + ' verifiche FALLITE' : 'Tutte le verifiche superate.'));
 process.exit(errori ? 1 : 0);

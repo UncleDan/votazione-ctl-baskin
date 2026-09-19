@@ -1,10 +1,13 @@
 /**
  * Votazione CTL Baskin — voto online anonimo, un voto per società
- * v7 — Google Apps Script legato a un Foglio Google
+ * v8 — Google Apps Script legato a un Foglio Google
  *
  * Codice sorgente: https://github.com/UncleDan/votazione-ctl-baskin
  * Copyright (c) 2026 Daniele Lolli (UncleDan) — Licenza MIT (vedi LICENSE)
  * SPDX-License-Identifier: MIT
+ *
+ * Il logo EISI è di proprietà di Ente Italiano Sport Inclusivi: non è coperto
+ * dalla licenza MIT e viene caricato in hotlinking dal sito eisi.it (vedi NOTICE).
  *
  * Round 1: le società eleggono i commissari CTL (qualifiche, deroga aiuto
  *          allenatore, commissari = metà delle società, min 3, max 6).
@@ -27,7 +30,10 @@ const SH = {
   RP: 'Risultati Presidente', RV: 'Risultati Vice', REP: 'Report', URNA: 'Riepilogo urna'
 };
 const REPO_URL = 'https://github.com/UncleDan/votazione-ctl-baskin';
-const VERSIONE = 'v7';
+const VERSIONE = 'v8';
+const LOGO_SVG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg';
+const LOGO_PNG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png';
+const PROPRIETA_LOGO = 'Logo © Ente Italiano Sport Inclusivi (EISI), tutti i diritti riservati';
 const P_SALT = 'SALT';
 const MAX_BALLOTTAGGI = 3;
 const ROUND = {
@@ -126,7 +132,9 @@ function setup() {
     ['Messaggio', 'Seleziona i candidati a cui dai la preferenza.', 'Testo sopra la scheda (round 1)'],
     ['Formatore di riferimento', '', 'Nome, senza votazione. Se vuole essere votante va inserito anche tra i Candidati come Autocandidatura'],
     ['Presidente', '', 'Compilato dal round 2; parità non risolte: scrivilo a mano'],
-    ['Vice', '', 'Compilato dal round 3; parità non risolte: scrivilo a mano']
+    ['Vice', '', 'Compilato dal round 3; parità non risolte: scrivilo a mano'],
+    ['Logo pagina web', LOGO_SVG, 'URL del logo sulla pagina di voto (hotlinking, SVG o PNG). Vuoto = nessun logo'],
+    ['Logo fogli (PNG)', LOGO_PNG, 'URL del logo nei resoconti: i fogli Google non mostrano SVG, serve PNG/JPG. Vuoto = nessun logo']
   ].forEach(r => ensureCfgRow_(r[0], r[1], r[2]));
   cfgCell_('Anno sportivo').setNumberFormat('@');  // testo: "2026/27" non diventa una data
 
@@ -384,6 +392,7 @@ function calcolaRisultati_(silenzioso) {
 
   const sh = sheet_(SH.RIS);
   sh.clearContents();
+  altezzeRighe_(sh);
   sh.getRange(1, 1, 1, RIS_HEADER.length).setValues([RIS_HEADER]).setFontWeight('bold').setBackground(BLU);
   if (out.length) sh.getRange(2, 1, out.length, RIS_HEADER.length).setValues(out);
   const r = (a, b, c3) => [a, b, c3 || '', '', '', '', '', ''];
@@ -403,7 +412,7 @@ function calcolaRisultati_(silenzioso) {
     r('Calcolato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm'))
   ];
   sh.getRange(out.length + 2, 1, riepilogo.length, RIS_HEADER.length).setValues(riepilogo);
-  scriviLinkRepo_(sh, out.length + 2 + riepilogo.length + 1);
+  scriviPiede_(sh, out.length + 2 + riepilogo.length + 1, c);
   sh.autoResizeColumns(1, RIS_HEADER.length);
   sh.activate();
   aggiornaReport();
@@ -514,6 +523,7 @@ function calcolaCarica_(r, silenzioso) {
   const ss = SpreadsheetApp.getActive();
   const sh = ss.getSheetByName(ROUND[r].ris) || ss.insertSheet(ROUND[r].ris);
   sh.clearContents();
+  altezzeRighe_(sh);
   sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold').setBackground(BLU);
   sh.getRange(2, 1, out.length, head.length).setValues(out);
   const f = (a, b) => [a, b, '', '', '', '', ''];
@@ -522,7 +532,7 @@ function calcolaCarica_(r, silenzioso) {
     f('Schede votate', d.schede.length), f('di cui bianche', d.bianche),
     f('Calcolato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm'))];
   sh.getRange(out.length + 2, 1, riep.length, head.length).setValues(riep);
-  scriviLinkRepo_(sh, out.length + 2 + riep.length + 1);
+  scriviPiede_(sh, out.length + 2 + riep.length + 1, c);
   sh.autoResizeColumns(1, head.length);
   sh.activate();
 
@@ -706,10 +716,12 @@ function scriviRisultatiBallottaggi_() {
       : st.stato === 'irrisolto' ? 'Parità non risolta dopo ' + MAX_BALLOTTAGGI + ' ballottaggi: decisione manuale'
       : 'In corso (ballottaggio ' + st.n + ')'));
   });
-  sh.getRange(1, 1, rows.length, W).setValues(rows);
-  sh.getRange(1, 1).setFontWeight('bold').setFontSize(14);
-  head.forEach(i => sh.getRange(i, 1, 1, W).setFontWeight('bold').setBackground(BLU));
-  scriviLinkRepo_(sh, rows.length + 2);
+  altezzeRighe_(sh);
+  const o = scriviLogo_(sh, 1, c) ? 1 : 0;  // con il logo il contenuto parte dalla riga 2
+  sh.getRange(1 + o, 1, rows.length, W).setValues(rows);
+  sh.getRange(1 + o, 1).setFontWeight('bold').setFontSize(14);
+  head.forEach(i => sh.getRange(i + o, 1, 1, W).setFontWeight('bold').setBackground(BLU));
+  scriviLinkRepo_(sh, rows.length + 2 + o);
   sh.autoResizeColumns(1, W);
 }
 
@@ -763,11 +775,13 @@ function aggiornaReport() {
   if (form && nomiCom.indexOf(form) < 0)
     rows.push(R(form, '', candForm ? candForm.squadra : '', 'Formatore di riferimento (non votante, non componente CTL)'));
 
-  sh.getRange(1, 1, rows.length, 4).setValues(rows);
-  sh.getRange(1, 1).setFontWeight('bold').setFontSize(14);
-  sh.getRange(6, 1, 5, 1).setFontWeight('bold');
-  sh.getRange(headRow, 1, 1, 4).setFontWeight('bold').setBackground(BLU);
-  scriviLinkRepo_(sh, rows.length + 2);
+  altezzeRighe_(sh);
+  const o = scriviLogo_(sh, 1, c) ? 1 : 0;
+  sh.getRange(1 + o, 1, rows.length, 4).setValues(rows);
+  sh.getRange(1 + o, 1).setFontWeight('bold').setFontSize(14);
+  sh.getRange(6 + o, 1, 5, 1).setFontWeight('bold');
+  sh.getRange(headRow + o, 1, 1, 4).setFontWeight('bold').setBackground(BLU);
+  scriviLinkRepo_(sh, rows.length + 2 + o);
   sh.autoResizeColumns(1, 4);
 }
 
@@ -844,11 +858,13 @@ function aggiornaUrna() {
 
   push(R(''));
   push(R('Le schede non contengono né codice, né votante, né orario: l\'ordine è casuale e non corrisponde all\'ordine di voto.'));
-  sh.getRange(1, 1, rows.length, W).setValues(rows);
-  sh.getRange(1, 1).setFontSize(14);
-  bold.forEach(i => sh.getRange(i, 1, 1, W).setFontWeight('bold'));
-  head.forEach(i => sh.getRange(i, 1, 1, W).setFontWeight('bold').setBackground(BLU));
-  scriviLinkRepo_(sh, rows.length + 1);
+  altezzeRighe_(sh);
+  const o = scriviLogo_(sh, 1, c) ? 1 : 0;
+  sh.getRange(1 + o, 1, rows.length, W).setValues(rows);
+  sh.getRange(1 + o, 1).setFontSize(14);
+  bold.forEach(i => sh.getRange(i + o, 1, 1, W).setFontWeight('bold'));
+  head.forEach(i => sh.getRange(i + o, 1, 1, W).setFontWeight('bold').setBackground(BLU));
+  scriviLinkRepo_(sh, rows.length + 1 + o);
   sh.autoResizeColumns(1, W);
 }
 
@@ -903,6 +919,8 @@ function doGet(e) {
   t.codice = (e && e.parameter && e.parameter.c) || '';
   t.repo = REPO_URL;
   t.versione = VERSIONE;
+  t.logo = String(cfg_()['Logo pagina web'] || '').trim();
+  t.proprietaLogo = PROPRIETA_LOGO;
   return t.evaluate()
     .setTitle(cfg_()['Titolo'] || 'Votazione')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -1043,12 +1061,33 @@ function intestazione_(c) {
     .filter(Boolean).join(' · ');
 }
 
-/** Riga con link cliccabile al codice sorgente, per trasparenza. */
+/** Riga con link cliccabile al codice sorgente (trasparenza) e nota di proprietà del logo. */
 function scriviLinkRepo_(sh, riga) {
-  const testo = 'Codice sorgente aperto e verificabile (licenza MIT, versione ' + VERSIONE + '): ' + REPO_URL;
-  const rt = SpreadsheetApp.newRichTextValue().setText(testo)
-    .setLinkUrl(testo.length - REPO_URL.length, testo.length, REPO_URL).build();
+  const testo = 'Codice sorgente aperto e verificabile (licenza MIT, versione ' + VERSIONE + '): ' + REPO_URL +
+    ' · ' + PROPRIETA_LOGO;
+  const da = testo.indexOf(REPO_URL);
+  const rt = SpreadsheetApp.newRichTextValue().setText(testo).setLinkUrl(da, da + REPO_URL.length, REPO_URL).build();
   sh.getRange(riga, 1).setRichTextValue(rt).setFontSize(9);
+}
+
+/** Logo in una cella (formula IMAGE, adattato alla cella). Restituisce true se inserito. */
+function scriviLogo_(sh, riga, c) {
+  const url = String((c || cfg_())['Logo fogli (PNG)'] || '').trim();
+  if (!/^https:\/\//i.test(url)) return false;
+  sh.getRange(riga, 1).setFormula('=IMAGE("' + url.replace(/"/g, '') + '", 1)');
+  sh.setRowHeight(riga, 110);
+  return true;
+}
+
+/** Piede dei fogli tabellari: logo e, sotto, il link al codice sorgente. */
+function scriviPiede_(sh, riga, c) {
+  const logo = scriviLogo_(sh, riga, c);
+  scriviLinkRepo_(sh, riga + (logo ? 1 : 0));
+}
+
+/** Riporta tutte le righe all'altezza standard (il logo alza la sua riga). */
+function altezzeRighe_(sh) {
+  try { sh.setRowHeights(1, sh.getMaxRows(), 21); } catch (e) {}
 }
 
 function aperta_(c) { return String(c['Stato']).trim().toUpperCase() === 'APERTA'; }
