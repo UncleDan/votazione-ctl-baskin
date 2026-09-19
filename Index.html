@@ -41,12 +41,12 @@
     <section id="s-closed" hidden><p>La votazione al momento non è aperta.</p></section>
 
     <section id="s-code" hidden>
-      <label class="f" for="codice">Codice della squadra</label>
+      <label class="f" for="codice">Codice personale</label>
       <input type="text" id="codice" autocomplete="off" autocapitalize="characters" spellcheck="false"
              placeholder="XXXX-XXXX" value="<?= codice ?>">
       <button id="b-verifica">Continua</button>
       <div class="msg" id="m-code"></div>
-      <p class="note">Il codice serve solo a garantire un voto per società: la scheda viene registrata senza codice, senza nome della squadra e senza orario.</p>
+      <p class="note">Il codice serve solo a garantire un voto per società: la scheda viene registrata senza codice, senza nome del votante e senza orario.</p>
     </section>
 
     <section id="s-vote" hidden>
@@ -90,6 +90,7 @@
     .withSuccessHandler(function (i) {
       INFO = i;
       $('titolo').textContent = i.titolo;
+      $('sub').textContent = i.sottotitolo;
       if (!i.aperta) return show('s-closed');
       show('s-code');
       if ($('codice').value.trim()) verifica();
@@ -107,8 +108,8 @@
         busy(false);
         if (!r.ok) { $('m-code').textContent = r.err; return; }
         CODE = c;
-        $('soc').textContent = 'Stai votando per: ' + r.squadra;
-        $('done-soc').textContent = r.squadra;
+        $('soc').textContent = INFO.prefisso + r.votante;
+        $('done-soc').textContent = r.votante;
         costruisci();
         show('s-vote');
       })
@@ -121,7 +122,7 @@
     var lista = $('lista');
     lista.innerHTML = '';
     var aiuti = INFO.candidati.some(function (x) { return /aiuto/i.test(x.qualifica); });
-    $('deroga').hidden = !aiuti;
+    $('deroga').hidden = !aiuti || !INFO.maxAiuti;
     $('deroga').textContent = 'Gli aiuti allenatore entrano in commissione solo se allenatori e autocandidature non bastano a coprire i posti (massimo ' + INFO.maxAiuti + ').';
     INFO.candidati.forEach(function (x, i) {
       var l = document.createElement('label');
@@ -141,7 +142,7 @@
 
   function aggiorna() {
     var n = scelte().length, pieno = n >= INFO.max;
-    $('contatore').textContent = 'Preferenze: ' + n + ' su massimo ' + INFO.max;
+    $('contatore').textContent = INFO.max === 1 ? (n ? 'Preferenza espressa (1 su 1)' : 'Esprimi una preferenza') : 'Preferenze: ' + n + ' su massimo ' + INFO.max;
     document.querySelectorAll('#lista input').forEach(function (cb) {
       cb.disabled = pieno && !cb.checked;
       cb.parentNode.classList.toggle('off', cb.disabled);
@@ -174,7 +175,7 @@
         show('s-done');
       })
       .withFailureHandler(fail('m-invio'))
-      .inviaVoto(CODE, scelte());
+      .inviaVoto(CODE, scelte(), INFO.round);
   }
 
   $('b-verifica').addEventListener('click', verifica);

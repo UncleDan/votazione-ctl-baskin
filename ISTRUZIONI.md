@@ -1,64 +1,66 @@
-# Votazione CTL — istruzioni (v3)
+# Votazione CTL — istruzioni (v4)
 
-Voto online anonimo, una scheda per squadra, utilizzabile da telefono senza account Google.
+Voto online anonimo in tre round, utilizzabile da telefono senza account Google:
 
-## Installazione (una volta, 10 minuti)
+| Round | Chi vota | Chi è votabile | Preferenze | Esito |
+|---|---|---|---|---|
+| 1 – Commissari CTL | una scheda per squadra | foglio *Candidati* | metà dei candidati (per eccesso) | commissari eletti |
+| 2 – Presidente | ogni commissario eletto | tutti i commissari | 1 | il più votato |
+| 3 – Vice | ogni commissario eletto | commissari tranne il Presidente | 1 | il più votato |
 
-1. Crea un nuovo **Foglio Google** (es. "Elezione CTL 2026").
-2. Menu **Estensioni → Apps Script**.
-3. Nel file `Code.gs` incolla il contenuto di `Votazione_CTL_Code_…gs`.
-4. **＋ → HTML**, chiamalo esattamente `Index` e incolla il contenuto di `Votazione_CTL_Index_…html`.
-5. Salva, torna al foglio e ricaricalo: compare il menu **🗳️ Votazione**.
-6. **🗳️ Votazione → 1. Inizializza / aggiorna fogli** (la prima volta Google chiede l'autorizzazione: accetta).
-7. In Apps Script: **Esegui il deployment → Nuovo deployment → App web**
-   - Esegui come: **Me**
-   - Chi ha accesso: **Chiunque**
+Il **Formatore di riferimento** non si vota: si indica in *Config*.
 
-### Aggiornamento da v1/v2
-Sostituisci `Code.gs` e `Index`, poi rilancia **1. Inizializza / aggiorna fogli**: il foglio *Codici* diventa *Squadre* (codici già generati conservati) e in *Candidati* vengono aggiunte le colonne Qualifica e Squadra. Infine **Gestisci deployment → modifica → Nuova versione** (l'URL resta lo stesso).
+## Installazione (una volta)
 
-## Preparazione di ogni votazione
+1. Crea un **Foglio Google** → **Estensioni → Apps Script**.
+2. In `Code.gs` incolla `Votazione_CTL_Code_…gs`; **＋ → HTML** chiamato esattamente `Index` con `Votazione_CTL_Index_…html`.
+3. Ricarica il foglio → menu **🗳️ Votazione → Inizializza / aggiorna fogli** (autorizza).
+4. Apps Script: **Esegui il deployment → Nuovo deployment → App web**, Esegui come **Me**, accesso **Chiunque**.
 
-1. Foglio **Squadre**: il nome di ogni squadra avente diritto nella colonna A. **Una riga = un voto**: se una società ha più squadre ma deve votare una volta sola, inseriscila una volta sola.
-2. Foglio **Candidati**, una riga per candidato:
-   - **Candidato** (in ordine alfabetico: è l'ordine della scheda);
-   - **Qualifica** dal menu a tendina: Allenatore, Aiuto allenatore, Autocandidatura;
-   - **Squadra** dal menu a tendina (legge il foglio Squadre);
-   - **Anni** di tesseramento/incarichi, per lo spareggio.
-3. **🗳️ Votazione → 2. Genera codici e link**: ogni squadra riceve un codice e un **link diretto** che apre la scheda già con il codice. I link si rigenerano ogni volta, così seguono sempre l'URL attuale dell'app.
-4. Foglio **Config**: lascia vuoti "Numero eletti" e "Max preferenze" per applicare il regolamento:
-   - commissari = metà delle squadre, arrotondata per eccesso, minimo 3, massimo 6;
-   - preferenze per scheda = metà dei candidati, arrotondata per eccesso;
-   - "Max aiuti allenatore" = 1 (deroga attuale; 0 = nessuno).
-5. Invia a ciascuna squadra **solo il suo** link (mail o messaggio privato).
+**Aggiornamento da versioni precedenti:** sostituisci `Code.gs` e `Index`, rilancia **Inizializza / aggiorna fogli**, poi **Gestisci deployment → modifica → Nuova versione** (l'URL resta lo stesso).
 
-## Come vengono assegnati i posti
+## Round 1 – Commissari CTL
 
-1. Si raccolgono le preferenze per tutti i candidati, aiuti allenatore compresi.
-2. Allenatori e autocandidature occupano i posti per primi, in ordine di preferenze. Se bastano, passano loro **indipendentemente dai voti** degli aiuti allenatore.
-3. Solo se non bastano, entra l'aiuto allenatore più votato (fino al limite della deroga).
-4. Eventuali posti ancora scoperti risultano **vacanti**; se gli eletti sono meno di 3 compare un avviso.
-5. Spareggio a pari preferenze: più anni di tesseramento/incarichi. Se pari anche negli anni: "PARITÀ — da risolvere".
+1. *Squadre*: una riga per squadra avente diritto (una riga = un voto).
+2. *Candidati*: nome, **Qualifica** (Allenatore / Aiuto allenatore / Autocandidatura), **Squadra**, anni per lo spareggio.
+3. *Config*: lascia vuoti "Numero eletti" e "Max preferenze" per applicare il regolamento (commissari = metà delle squadre per eccesso, min 3, max 6). "Max aiuti allenatore" = 1.
+4. **Round 1 → Genera codici e link squadre**, invia a ogni squadra il suo link.
+5. **Round 1 → Apri**, poi **Chiudi**, poi **Calcola risultati**.
 
-Il foglio *Risultati* mostra la graduatoria completa con qualifica, squadra, esito e motivazione.
+Assegnazione dei posti: allenatori e autocandidature entrano per primi in ordine di preferenze; solo se non bastano entra l'aiuto allenatore più votato (max 1); i posti ancora scoperti restano vacanti. Spareggio: anni di tesseramento/incarichi.
+Se compare **PARITÀ — da risolvere**, scrivi a mano ELETTO o Non eletto nella colonna Esito di *Risultati*.
 
-## Durante e dopo
+## Round 2 – Presidente
 
-- **Apri votazione** → controlla nomi duplicati, qualifiche mancanti e numero di candidati.
-- **Aggiorna partecipazione** → quali squadre hanno votato (non cosa).
-- **Chiudi votazione** → poi **Calcola risultati**.
+1. **Round 2 → Prepara commissari e link**: crea il foglio *Commissari* con gli ELETTI del round 1, ciascuno con codice e link personale. **Lo stesso link vale anche per il round 3.**
+2. Invia a ogni commissario il suo link.
+3. **Round 2 → Apri / Chiudi / Calcola risultati**. Vince chi ha più voti (maggioranza semplice); a pari voti precede chi ha più anni. Il nome viene scritto in *Config → Presidente*.
+
+## Round 3 – Vice
+
+**Round 3 → Apri / Chiudi / Calcola risultati**: stessi link, si vota tra i commissari rimanenti. Il nome va in *Config → Vice*.
+
+Se in round 2 o 3 resta una parità, la risolvi come da regolamento e scrivi il nome a mano in *Config*, poi **Aggiorna report**.
+
+## Formatore di riferimento
+
+- Scrivi il nome in *Config → Formatore di riferimento* (nessuna votazione).
+- Preferibilmente **non votante**: non compare tra i candidati e non fa parte della CTL.
+- Se vuole essere **votante**, va inserito anche in *Candidati* come **Autocandidatura** (stesso nome, scritto identico). Se viene eletto, nel report risulta sia commissario sia formatore di riferimento, e vota nei round 2 e 3.
+
+## Report
+
+Il foglio *Report* si aggiorna da solo dopo ogni calcolo (o da **Aggiorna report**): Presidente, Vice, Formatore di riferimento con la sua condizione (votante / non votante), elenco dei commissari con qualifica, squadra e ruolo (es. "Commissario · Presidente", "Commissario · Formatore di riferimento"). Si stampa o si esporta in PDF da **File → Scarica**.
 
 ## Anonimato
 
-- Le schede non contengono né codice, né squadra, né orario, e vengono salvate in posizione casuale nelle proprietà dello script (non nel foglio, quindi nemmeno nella cronologia versioni).
-- Dei codici usati resta solo un'impronta (hash): si sa *che* una squadra ha votato, non *come*.
-- Chi amministra lo script è il "custode dell'urna": per trasparenza si può far verificare il codice a un secondo membro prima di aprire il voto.
+- Le schede non contengono codice, votante né orario, sono salvate in posizione casuale nelle proprietà dello script (fuori dal foglio e dalla sua cronologia).
+- Dei codici usati resta solo un hash: si sa *chi* ha votato, non *come*.
+- Nei round 2 e 3 i votanti sono pochi (3–6): l'anonimato tecnico c'è, ma con numeri così piccoli l'esito può comunque far intuire i voti.
+- Chi amministra lo script è il "custode dell'urna": per trasparenza si può far verificare il codice a un secondo membro.
 
-## Elezione di Responsabile e vice CTL
+## Altre voci del menu
 
-Nuovo foglio (o "Azzera votazione"): in *Candidati* i membri della CTL (qualifica non necessaria), in *Squadre* una riga per ogni membro votante, *Max preferenze* = 1, *Numero eletti* = 2 (o separa in due votazioni se il regolamento lo richiede), *Max aiuti allenatore* vuoto o come da regolamento.
-
-## Note
-
-- Non rinominare candidati o squadre a votazione aperta.
-- Codice smarrito: cancellalo nel foglio *Squadre* e rigenera (solo se quella squadra non ha ancora votato).
+- **Aggiorna partecipazione**: chi ha già votato nel round in corso.
+- **Azzera round…**: cancella le schede di un round (1, 2, 3) o di TUTTI. I codici restano validi.
+- Un solo round alla volta può essere aperto; non modificare candidati o votanti a round aperto.
