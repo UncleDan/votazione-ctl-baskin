@@ -1,21 +1,26 @@
 /**
- * Votazione CTL — voto online anonimo, un voto per società
- * v2 — Google Apps Script legato a un Foglio Google
+ * Votazione CTL — voto online anonimo, un voto per squadra/società
+ * v3 — Google Apps Script legato a un Foglio Google
+ *
+ * Novità v3: qualifica dei candidati (Allenatore / Aiuto allenatore /
+ * Autocandidatura) con deroga "max 1 aiuto allenatore", foglio Squadre con
+ * abbinamento candidato→squadra e link diretti di voto.
  *
  * Anonimato: le schede sono salvate nelle Script Properties (non nel foglio,
  * quindi senza cronologia versioni), senza codice né orario, e inserite in
  * posizione casuale. Dei codici usati si conserva solo un hash con sale.
  */
 
-const SH = { CONFIG: 'Config', CAND: 'Candidati', COD: 'Codici', RIS: 'Risultati' };
+const SH = { CONFIG: 'Config', CAND: 'Candidati', COD: 'Squadre', RIS: 'Risultati' };
 const P_BALLOTS = 'BALLOTS', P_USED = 'USED', P_SALT = 'SALT';
 const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // niente 0/O, 1/I
+const QUALIFICHE = ['Allenatore', 'Aiuto allenatore', 'Autocandidatura'];
 
 /* ---------------- Menu amministratore ---------------- */
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('🗳️ Votazione')
-    .addItem('1. Inizializza fogli', 'setup')
+    .addItem('1. Inizializza / aggiorna fogli', 'setup')
     .addItem('2. Genera codici e link', 'generaCodici')
     .addSeparator()
     .addItem('Apri votazione', 'apriVotazione')
@@ -29,20 +34,41 @@ function onOpen() {
 
 function setup() {
   const ss = SpreadsheetApp.getActive();
+
+  // Migrazione v1/v2: il foglio "Codici" diventa "Squadre"
+  const vecchio = ss.getSheetByName('Codici');
+  if (vecchio && !ss.getSheetByName(SH.COD)) {
+    vecchio.setName(SH.COD);
+    vecchio.getRange('A1').setValue('Squadra');
+  }
+
   ensureSheet_(ss, SH.CONFIG, [
     ['Parametro', 'Valore', 'Note'],
     ['Titolo', 'Elezione CTL Baskin', 'Titolo della pagina di voto'],
     ['Stato', 'CHIUSA', 'APERTA / CHIUSA — usa il menu'],
     ['Max preferenze', '', 'Vuoto = metà dei candidati arrotondata per eccesso'],
-    ['Numero eletti', '', 'Vuoto = regola CTL: metà delle società per eccesso, min 3, max 6'],
+    ['Numero eletti', '', 'Vuoto = regola CTL: metà delle squadre per eccesso, min 3, max 6'],
+    ['Max aiuti allenatore', 1, 'Deroga: aiuti allenatore ammessi, solo se mancano allenatori/autocandidature'],
     ['Messaggio', 'Seleziona i candidati a cui dai la preferenza.', 'Testo sopra la scheda']
   ]);
-  ensureSheet_(ss, SH.CAND, [['Candidato', 'Anni tesseramento/incarichi (spareggio)', 'Note']]);
-  ensureSheet_(ss, SH.COD, [['Società', 'Codice', 'Link personale', 'Ha votato']]);
-  ensureSheet_(ss, SH.RIS, [['Posizione', 'Candidato', 'Preferenze', 'Anni (spareggio)', 'Esito', 'Note']]);
+  ensureCfgRow_('Max aiuti allenatore', 1, 'Deroga: aiuti allenatore ammessi, solo se mancano allenatori/autocandidature');
+
+  ensureSheet_(ss, SH.COD, [['Squadra', 'Codice', 'Link diretto di voto', 'Ha votato']]);
+  const cand = ensureSheet_(ss, SH.CAND, [['Candidato', 'Qualifica', 'Squadra', 'Anni tesseramento/incarichi (spareggio)', 'Note']]);
+  // Migrazione v1/v2: Candidato | Anni | Note  →  aggiunge Qualifica e Squadra
+  if (!headers_(cand).qualifica) {
+    cand.insertColumnsAfter(1, 2);
+    cand.getRange(1, 2, 1, 2).setValues([['Qualifica', 'Squadra']]).setFontWeight('bold').setBackground('#e8eaf6');
+  }
+  ensureSheet_(ss, SH.RIS, [RIS_HEADER]);
+
+  applicaValidazioni_();
   const props = PropertiesService.getScriptProperties();
   if (!props.getProperty(P_SALT)) props.setProperty(P_SALT, Utilities.getUuid());
-  SpreadsheetApp.getUi().alert('Fogli pronti. Compila "Candidati" e "Codici" (solo la colonna Società), poi usa "Genera codici e link".');
+  SpreadsheetApp.getUi().alert(
+    'Fogli pronti.\n\n1) "Squadre": un nome per riga (una riga = un voto).\n' +
+    '2) "Candidati": nome, qualifica e squadra (menu a tendina).\n' +
+    '3) Menu → "Genera codici e link".');
 }
 
 function ensureSheet_(ss, name, rows) {
@@ -56,17 +82,33 @@ function ensureSheet_(ss, name, rows) {
   return sh;
 }
 
+function ensureCfgRow_(key, val, note) {
+  const sh = sheet_(SH.CONFIG);
+  const keys = sh.getRange(1, 1, sh.getLastRow(), 1).getValues().map(r => String(r[0]).trim());
+  if (keys.indexOf(key) < 0) sh.appendRow([key, val, note]);
+}
+
+function applicaValidazioni_() {
+  const cand = sheet_(SH.CAND), sq = sheet_(SH.COD);
+  const h = headers_(cand);
+  const n = Math.max(cand.getMaxRows() - 1, 1);
+  cand.getRange(2, h.qualifica, n, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireValueInList(QUALIFICHE, true).setAllowInvalid(false).build());
+  cand.getRange(2, h.squadra, n, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireValueInRange(sq.getRange('A2:A'), true).setAllowInvalid(true).build());
+}
+
 function generaCodici() {
   const sh = sheet_(SH.COD);
   const n = sh.getLastRow() - 1;
-  if (n < 1) return SpreadsheetApp.getUi().alert('Inserisci prima le società nella colonna A del foglio "Codici".');
+  if (n < 1) return SpreadsheetApp.getUi().alert('Inserisci prima i nomi delle squadre nella colonna A del foglio "Squadre".');
   const rows = sh.getRange(2, 1, n, 3).getValues();
   const esistenti = new Set(rows.map(r => norm_(r[1])).filter(Boolean));
   let url = '';
   try { url = ScriptApp.getService().getUrl() || ''; } catch (e) {}
   let nuovi = 0;
   rows.forEach(r => {
-    if (!String(r[0]).trim()) return;
+    if (!String(r[0]).trim()) { r[2] = ''; return; }
     if (!norm_(r[1])) {
       let c;
       do { c = codiceCasuale_(); } while (esistenti.has(c));
@@ -74,11 +116,13 @@ function generaCodici() {
       r[1] = c.slice(0, 4) + '-' + c.slice(4);
       nuovi++;
     }
-    if (url && !r[2]) r[2] = url + '?c=' + norm_(r[1]);
+    r[2] = url ? url + '?c=' + norm_(r[1]) : '';  // rigenerati sempre: seguono l'URL attuale
   });
   sh.getRange(2, 1, n, 3).setValues(rows);
-  SpreadsheetApp.getUi().alert(nuovi + ' codici generati.' +
-    (url ? '' : '\n\nLink non ancora disponibili: pubblica prima l\'app web (Esegui il deployment → App web), poi rilancia questa voce.'));
+  applicaValidazioni_();
+  SpreadsheetApp.getUi().alert(nuovi + ' nuovi codici generati, link aggiornati.' +
+    (url ? '\n\nInvia a ogni squadra solo il SUO link.' :
+      '\n\nLink non ancora disponibili: pubblica prima l\'app web (Esegui il deployment → App web), poi rilancia questa voce.'));
 }
 
 function codiceCasuale_() {
@@ -90,11 +134,17 @@ function codiceCasuale_() {
 
 function apriVotazione() {
   const ui = SpreadsheetApp.getUi();
-  const n = candidati_().length, posti = posti_(cfg_());
-  if (n < 1) return ui.alert('Nessun candidato inserito.');
-  if (n < posti && ui.alert('Candidati insufficienti', 'Ci sono ' + n + ' candidati per ' + posti + ' posti. Aprire comunque?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  const cand = candidati_(), c = cfg_(), posti = posti_(c);
+  if (cand.length < 1) return ui.alert('Nessun candidato inserito.');
+  const nomi = cand.map(x => x.nome);
+  const doppi = nomi.filter((x, i) => nomi.indexOf(x) !== i);
+  if (doppi.length) return ui.alert('Candidati con lo stesso nome: ' + doppi.join(', ') + '. Rendili distinguibili (es. iniziale del secondo nome).');
+  const senzaQ = cand.filter(x => !x.qualifica).map(x => x.nome);
+  if (senzaQ.length && ui.alert('Qualifica mancante', 'Senza qualifica (trattati come allenatori): ' + senzaQ.join(', ') + '.\nAprire comunque?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  if (cand.length < posti && ui.alert('Candidati insufficienti', 'Ci sono ' + cand.length + ' candidati per ' + posti + ' posti. Aprire comunque?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
   setCfg_('Stato', 'APERTA');
-  ui.alert('Votazione APERTA — posti da assegnare: ' + posti + ', max preferenze per scheda: ' + maxPref_(cfg_(), n) + '.\nNon modificare candidati e società finché è in corso.');
+  ui.alert('Votazione APERTA — posti: ' + posti + ', max preferenze per scheda: ' + maxPref_(c, cand.length) +
+    '.\nNon modificare candidati e squadre finché è in corso.');
 }
 
 function chiudiVotazione() {
@@ -112,8 +162,12 @@ function aggiornaPartecipazione() {
   sh.getRange(2, 4, n, 1).setValues(out);
   const votanti = out.filter(r => r[0]).length;
   const aventi = codici.filter(r => norm_(r[0])).length;
-  SpreadsheetApp.getActive().toast('Hanno votato ' + votanti + ' società su ' + aventi + '.', 'Partecipazione', 8);
+  SpreadsheetApp.getActive().toast('Hanno votato ' + votanti + ' squadre su ' + aventi + '.', 'Partecipazione', 8);
 }
+
+/* ---------------- Risultati ---------------- */
+
+const RIS_HEADER = ['Posizione', 'Candidato', 'Qualifica', 'Squadra', 'Preferenze', 'Anni (spareggio)', 'Esito', 'Note'];
 
 function calcolaRisultati() {
   const ui = SpreadsheetApp.getUi();
@@ -129,44 +183,91 @@ function calcolaRisultati() {
     s.forEach(nome => { if (nome in voti) { voti[nome]++; totPref++; } });
   });
 
-  const lista = cand.map(x => ({ nome: x.nome, anni: x.anni, voti: voti[x.nome] }))
+  const lista = cand.map(x => Object.assign({}, x, { voti: voti[x.nome] }))
     .sort((a, b) => b.voti - a.voti || b.anni - a.anni || a.nome.localeCompare(b.nome, 'it'));
 
   const posti = posti_(c);
+  const maxAiuti = maxAiuti_(c);
+  const ass = assegna_(lista, posti, maxAiuti);
+
+  // posizione in graduatoria generale (pari voti e pari anni = stessa posizione)
   const out = [];
-  let i = 0;
-  while (i < lista.length) {
-    let j = i;
-    while (j + 1 < lista.length && lista[j + 1].voti === lista[i].voti && lista[j + 1].anni === lista[i].anni) j++;
-    for (let k = i; k <= j; k++) {
-      const x = lista[k];
-      const pariVoti = lista.filter(y => y.voti === x.voti).length > 1;
-      let esito = '';
-      if (posti) esito = j < posti ? 'ELETTO' : (i >= posti ? 'Non eletto' : 'PARITÀ — da risolvere');
-      else if (j > i) esito = 'PARITÀ — da risolvere';
-      const nota = j > i ? 'Pari preferenze e pari anni'
-        : (pariVoti ? 'Pari preferenze: precedenza per anni' : '');
-      out.push([i + 1, x.nome, x.voti, x.anni, esito, nota]);
+  lista.forEach((x, i) => {
+    const pos = (i > 0 && pari_(x, lista[i - 1])) ? out[i - 1][0] : i + 1;
+    out.push([pos, x.nome, x.qualifica || '—', x.squadra, x.voti, x.anni, ass.esito[x.nome].esito, ass.esito[x.nome].nota]);
+  });
+
+  const eletti = lista.filter(x => ass.esito[x.nome].esito === 'ELETTO').length;
+  const sh = sheet_(SH.RIS);
+  sh.clearContents();
+  sh.getRange(1, 1, 1, RIS_HEADER.length).setValues([RIS_HEADER]).setFontWeight('bold').setBackground('#e8eaf6');
+  if (out.length) sh.getRange(2, 1, out.length, RIS_HEADER.length).setValues(out);
+
+  const r = (a, b, c3) => [a, b, c3 || '', '', '', '', '', ''];
+  const riepilogo = [
+    r('', ''),
+    r('Riepilogo', ''),
+    r('Squadre aventi diritto', numSquadre_()),
+    r('Schede votate', schede.length),
+    r('di cui bianche', bianche),
+    r('Preferenze espresse', totPref),
+    r('Max preferenze per scheda', maxPref_(c, cand.length)),
+    r('Commissari da eleggere', posti),
+    r('Eletti', eletti, ass.parita ? 'ATTENZIONE: parità da risolvere' : ''),
+    r('Posti vacanti', ass.vacanti, (!ass.parita && eletti < 3) ? 'ATTENZIONE: CTL sotto il minimo di 3 membri' : ''),
+    r('Calcolato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm'))
+  ];
+  sh.getRange(out.length + 2, 1, riepilogo.length, RIS_HEADER.length).setValues(riepilogo);
+  sh.autoResizeColumns(1, RIS_HEADER.length);
+  sh.activate();
+}
+
+function pari_(a, b) { return !!a && !!b && a.voti === b.voti && a.anni === b.anni; }
+
+/**
+ * Assegna i posti:
+ * - allenatori e autocandidature entrano per primi, in ordine di preferenze
+ *   (spareggio per anni), indipendentemente dal confronto con gli aiuti;
+ * - solo se non bastano a coprire i posti entrano gli aiuti allenatore, in
+ *   ordine di preferenze, fino al limite della deroga (default 1);
+ * - gli eventuali posti rimanenti restano vacanti.
+ */
+function assegna_(lista, posti, maxAiuti) {
+  const esito = {};
+  lista.forEach(x => esito[x.nome] = { esito: 'Non eletto', nota: '' });
+  let parita = false;
+
+  function eleggi(arr, n, nota) {
+    if (n <= 0 || !arr.length) return 0;
+    if (arr.length <= n) {
+      arr.forEach(x => esito[x.nome] = { esito: 'ELETTO', nota: nota });
+      return arr.length;
     }
-    i = j + 1;
+    const taglio = pari_(arr[n - 1], arr[n]);  // parità a cavallo dell'ultimo posto
+    arr.forEach((x, i) => {
+      if (taglio && pari_(x, arr[n - 1])) {
+        esito[x.nome] = { esito: 'PARITÀ — da risolvere', nota: 'Pari preferenze e pari anni sull\'ultimo posto' };
+        parita = true;
+      } else if (i < n) {
+        const pariVoti = arr.some(y => y !== x && y.voti === x.voti);
+        esito[x.nome] = { esito: 'ELETTO', nota: [nota, pariVoti ? 'precedenza per anni' : ''].filter(Boolean).join('; ') };
+      }
+    });
+    return n;
   }
 
-  const sh = sheet_(SH.RIS);
-  sh.getRange(2, 1, Math.max(sh.getMaxRows() - 1, 1), 6).clearContent();
-  if (out.length) sh.getRange(2, 1, out.length, 6).setValues(out);
-  const riepilogo = [
-    ['', '', '', '', '', ''],
-    ['Riepilogo', '', '', '', '', ''],
-    ['Società aventi diritto', numSocieta_(), '', '', '', ''],
-    ['Commissari da eleggere', posti, cand.length < posti ? 'ATTENZIONE: candidati insufficienti' : '', '', '', ''],
-    ['Schede votate', schede.length, '', '', '', ''],
-    ['di cui bianche', bianche, '', '', '', ''],
-    ['Preferenze espresse', totPref, '', '', '', ''],
-    ['Max preferenze per scheda', maxPref_(c, cand.length), '', '', '', ''],
-    ['Calcolato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm'), '', '', '', '']
-  ];
-  sh.getRange(out.length + 2, 1, riepilogo.length, 6).setValues(riepilogo);
-  sh.activate();
+  const A = lista.filter(x => !x.aiuto);   // allenatori, autocandidature, senza qualifica
+  const B = lista.filter(x => x.aiuto);    // aiuti allenatore
+  const daA = eleggi(A, posti, '');
+  const resto = posti - daA;
+  let daB = 0;
+  if (resto > 0) {
+    daB = eleggi(B, Math.min(resto, maxAiuti), 'Deroga aiuto allenatore');
+    B.forEach(x => { if (esito[x.nome].esito === 'Non eletto') esito[x.nome].nota = 'Oltre il limite di aiuti allenatore'; });
+  } else {
+    B.forEach(x => esito[x.nome].nota = 'Aiuto allenatore: entra solo se mancano allenatori/autocandidature');
+  }
+  return { esito: esito, vacanti: Math.max(posti - daA - daB, 0), parita: parita };
 }
 
 function azzeraVotazione() {
@@ -181,7 +282,7 @@ function azzeraVotazione() {
   const cod = sheet_(SH.COD);
   if (cod.getLastRow() > 1) cod.getRange(2, 4, cod.getLastRow() - 1, 1).clearContent();
   const ris = sheet_(SH.RIS);
-  if (ris.getLastRow() > 1) ris.getRange(2, 1, ris.getLastRow() - 1, 6).clearContent();
+  if (ris.getLastRow() > 1) ris.getRange(2, 1, ris.getLastRow() - 1, RIS_HEADER.length).clearContent();
   ui.alert('Votazione azzerata. I codici esistenti restano validi per una nuova votazione.');
 }
 
@@ -202,19 +303,20 @@ function getInfo() {
     titolo: String(c['Titolo'] || 'Votazione'),
     messaggio: String(c['Messaggio'] || ''),
     aperta: aperta_(c),
-    candidati: cand.map(x => x.nome),
+    candidati: cand.map(x => ({ nome: x.nome, qualifica: x.qualifica, squadra: x.squadra })),
     max: maxPref_(c, cand.length),
-    eletti: posti_(c)
+    eletti: posti_(c),
+    maxAiuti: maxAiuti_(c)
   };
 }
 
 function verificaCodice(codice) {
   const c = cfg_();
   if (!aperta_(c)) return { ok: false, err: 'La votazione non è aperta.' };
-  const soc = codiciMap_()[norm_(codice)];
-  if (!soc) return { ok: false, err: 'Codice non valido. Controlla di averlo scritto correttamente.' };
+  const sq = codiciMap_()[norm_(codice)];
+  if (!sq) return { ok: false, err: 'Codice non valido. Controlla di averlo scritto correttamente.' };
   if (usati_().indexOf(hash_(codice)) >= 0) return { ok: false, err: 'Con questo codice è già stato espresso il voto.' };
-  return { ok: true, societa: soc };
+  return { ok: true, squadra: sq };
 }
 
 function inviaVoto(codice, scelte) {
@@ -239,7 +341,7 @@ function inviaVoto(codice, scelte) {
     used.push(hash_(codice));
     used.sort();
     props.setProperties({ [P_BALLOTS]: JSON.stringify(schede), [P_USED]: JSON.stringify(used) });
-    return { ok: true, societa: v.societa };
+    return { ok: true, squadra: v.squadra };
   } finally {
     lock.releaseLock();
   }
@@ -249,7 +351,7 @@ function inviaVoto(codice, scelte) {
 
 function sheet_(name) {
   const sh = SpreadsheetApp.getActive().getSheetByName(name);
-  if (!sh) throw new Error('Foglio "' + name + '" mancante: usa Votazione → Inizializza fogli.');
+  if (!sh) throw new Error('Foglio "' + name + '" mancante: usa Votazione → Inizializza / aggiorna fogli.');
   return sh;
 }
 
@@ -270,12 +372,29 @@ function setCfg_(key, val) {
 
 function aperta_(c) { return String(c['Stato']).trim().toUpperCase() === 'APERTA'; }
 
+/** Trova le colonne del foglio Candidati dall'intestazione (robusto a spostamenti). */
+function headers_(sh) {
+  const h = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(x => String(x).toLowerCase());
+  const find = p => { const i = h.findIndex(x => x.indexOf(p) === 0); return i >= 0 ? i + 1 : 0; };
+  return { nome: find('candidat') || 1, qualifica: find('qualific'), squadra: find('squadr'), anni: find('anni') };
+}
+
 function candidati_() {
   const sh = sheet_(SH.CAND);
   if (sh.getLastRow() < 2) return [];
-  return sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues()
-    .filter(r => String(r[0]).trim())
-    .map(r => ({ nome: String(r[0]).trim(), anni: Number(r[1]) || 0 }));
+  const h = headers_(sh);
+  const v = sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getValues();
+  const col = (r, i) => i ? r[i - 1] : '';
+  return v.filter(r => String(col(r, h.nome)).trim()).map(r => {
+    const q = String(col(r, h.qualifica)).trim();
+    return {
+      nome: String(col(r, h.nome)).trim(),
+      qualifica: q,
+      aiuto: /aiuto/i.test(q),
+      squadra: String(col(r, h.squadra)).trim(),
+      anni: Number(col(r, h.anni)) || 0
+    };
+  });
 }
 
 function maxPref_(c, n) {
@@ -283,18 +402,23 @@ function maxPref_(c, n) {
   return v > 0 ? Math.min(v, n) : Math.ceil(n / 2);
 }
 
+function maxAiuti_(c) {
+  const v = parseInt(c['Max aiuti allenatore'], 10);
+  return isNaN(v) ? 1 : Math.max(v, 0);
+}
+
 /**
  * Numero di eletti. Se "Numero eletti" è compilato vale quello (es. 2 per
- * Responsabile + vice); altrimenti regola CTL: metà delle società
+ * Responsabile + vice); altrimenti regola CTL: metà delle squadre
  * partecipanti arrotondata per eccesso, minimo 3, massimo 6.
  */
 function posti_(c) {
   const v = parseInt(c['Numero eletti'], 10);
   if (v > 0) return v;
-  return Math.min(6, Math.max(3, Math.ceil(numSocieta_() / 2)));
+  return Math.min(6, Math.max(3, Math.ceil(numSquadre_() / 2)));
 }
 
-function numSocieta_() {
+function numSquadre_() {
   const sh = sheet_(SH.COD);
   if (sh.getLastRow() < 2) return 0;
   return sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues().filter(r => String(r[0]).trim()).length;

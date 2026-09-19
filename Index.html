@@ -24,6 +24,7 @@
   .cand { display:flex; align-items:center; gap:14px; padding:14px 6px; border-bottom:1px dashed var(--line); cursor:pointer; }
   .cand input { width:26px; height:26px; accent-color:var(--accent); flex:none; }
   .cand.off { opacity:.45; }
+  .cand small { display:block; color:var(--muted); font:13px/1.3 system-ui, sans-serif; margin-top:2px; }
   ul.r { padding-left:20px; margin:0 0 10px; }
   .ok { color:var(--ok); font-size:3rem; line-height:1; margin-bottom:8px; }
   .note { color:var(--muted); font:13px/1.4 system-ui, sans-serif; margin-top:18px; }
@@ -33,24 +34,25 @@
 <main>
   <div class="scheda">
     <h1 id="titolo">Votazione</h1>
-    <p class="sub" id="sub">Voto anonimo — una scheda per società</p>
+    <p class="sub" id="sub">Voto anonimo — una scheda per squadra</p>
 
     <section id="s-load"><p>Caricamento…</p></section>
 
     <section id="s-closed" hidden><p>La votazione al momento non è aperta.</p></section>
 
     <section id="s-code" hidden>
-      <label class="f" for="codice">Codice della società</label>
+      <label class="f" for="codice">Codice della squadra</label>
       <input type="text" id="codice" autocomplete="off" autocapitalize="characters" spellcheck="false"
              placeholder="XXXX-XXXX" value="<?= codice ?>">
       <button id="b-verifica">Continua</button>
       <div class="msg" id="m-code"></div>
-      <p class="note">Il codice serve solo a garantire un voto per società: la scheda viene registrata senza codice, senza nome e senza orario.</p>
+      <p class="note">Il codice serve solo a garantire un voto per società: la scheda viene registrata senza codice, senza nome della squadra e senza orario.</p>
     </section>
 
     <section id="s-vote" hidden>
       <p id="soc"></p>
       <p id="messaggio"></p>
+      <p class="note" id="deroga" hidden></p>
       <div class="cont" id="contatore"></div>
       <div id="lista"></div>
       <button id="b-riepilogo">Rivedi la scheda</button>
@@ -105,8 +107,8 @@
         busy(false);
         if (!r.ok) { $('m-code').textContent = r.err; return; }
         CODE = c;
-        $('soc').textContent = 'Stai votando per: ' + r.societa;
-        $('done-soc').textContent = r.societa;
+        $('soc').textContent = 'Stai votando per: ' + r.squadra;
+        $('done-soc').textContent = r.squadra;
         costruisci();
         show('s-vote');
       })
@@ -118,14 +120,19 @@
     $('messaggio').textContent = (INFO.eletti ? 'Posti da assegnare: ' + INFO.eletti + '. ' : '') + INFO.messaggio;
     var lista = $('lista');
     lista.innerHTML = '';
-    INFO.candidati.forEach(function (nome, i) {
+    var aiuti = INFO.candidati.some(function (x) { return /aiuto/i.test(x.qualifica); });
+    $('deroga').hidden = !aiuti;
+    $('deroga').textContent = 'Gli aiuti allenatore entrano in commissione solo se allenatori e autocandidature non bastano a coprire i posti (massimo ' + INFO.maxAiuti + ').';
+    INFO.candidati.forEach(function (x, i) {
       var l = document.createElement('label');
       l.className = 'cand';
       var cb = document.createElement('input');
-      cb.type = 'checkbox'; cb.value = nome; cb.id = 'c' + i;
+      cb.type = 'checkbox'; cb.value = x.nome; cb.id = 'c' + i;
       cb.addEventListener('change', aggiorna);
       var s = document.createElement('span');
-      s.textContent = nome;
+      s.textContent = x.nome;
+      var dett = [x.qualifica, x.squadra].filter(Boolean).join(' · ');
+      if (dett) { var sm = document.createElement('small'); sm.textContent = dett; s.appendChild(sm); }
       l.appendChild(cb); l.appendChild(s);
       lista.appendChild(l);
     });
