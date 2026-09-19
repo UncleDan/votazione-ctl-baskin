@@ -1,4 +1,4 @@
-# Votazione CTL — istruzioni (v4)
+# Votazione CTL Baskin — istruzioni (v5)
 
 Voto online anonimo in tre round, utilizzabile da telefono senza account Google:
 
@@ -9,6 +9,8 @@ Voto online anonimo in tre round, utilizzabile da telefono senza account Google:
 | 3 – Vice | ogni commissario eletto | commissari tranne il Presidente | 1 | il più votato |
 
 Il **Formatore di riferimento** non si vota: si indica in *Config*.
+
+Codice sorgente aperto: <https://github.com/UncleDan/votazione-ctl-baskin> (licenza MIT). Il link compare anche in fondo alla pagina di voto, così chiunque può verificare come funziona.
 
 ## Installazione (una volta)
 
@@ -23,7 +25,7 @@ Il **Formatore di riferimento** non si vota: si indica in *Config*.
 
 1. *Squadre*: una riga per squadra avente diritto (una riga = un voto).
 2. *Candidati*: nome, **Qualifica** (Allenatore / Aiuto allenatore / Autocandidatura), **Squadra**, anni per lo spareggio.
-3. *Config*: lascia vuoti "Numero eletti" e "Max preferenze" per applicare il regolamento (commissari = metà delle squadre per eccesso, min 3, max 6). "Max aiuti allenatore" = 1.
+3. *Config*: compila **Sezione territoriale** (es. Emilia-Romagna: compare sulla pagina di voto, nei risultati, nel report e nel riepilogo urna); lascia vuoti "Numero eletti" e "Max preferenze" per applicare il regolamento (commissari = metà delle squadre per eccesso, min 3, max 6). "Max aiuti allenatore" = 1.
 4. **Round 1 → Genera codici e link squadre**, invia a ogni squadra il suo link.
 5. **Round 1 → Apri**, poi **Chiudi**, poi **Calcola risultati**.
 
@@ -51,6 +53,17 @@ Se in round 2 o 3 resta una parità, la risolvi come da regolamento e scrivi il 
 ## Report
 
 Il foglio *Report* si aggiorna da solo dopo ogni calcolo (o da **Aggiorna report**): Presidente, Vice, Formatore di riferimento con la sua condizione (votante / non votante), elenco dei commissari con qualifica, squadra e ruolo (es. "Commissario · Presidente", "Commissario · Formatore di riferimento"). Si stampa o si esporta in PDF da **File → Scarica**.
+
+## Riepilogo urna (per il custode)
+
+Il foglio *Riepilogo urna* si aggiorna alla chiusura di ogni round, dopo ogni calcolo e da **Aggiorna riepilogo urna**. Per ciascun round riporta:
+
+- aventi diritto, chi ha votato e chi no;
+- **controllo di coerenza**: numero di schede nell'urna = numero di codici usati (altrimenti "ANOMALIA");
+- schede bianche e preferenze per candidato;
+- l'elenco delle **schede anonime** una per riga, in ordine casuale, per poter ricontare a mano.
+
+A round **aperto** mostra solo partecipazione e numero di schede: conteggi e schede compaiono dopo la chiusura.
 
 ## Anonimato
 

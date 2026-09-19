@@ -1,6 +1,10 @@
 /**
- * Votazione CTL — voto online anonimo, un voto per squadra/società
- * v4 — Google Apps Script legato a un Foglio Google
+ * Votazione CTL Baskin — voto online anonimo, un voto per squadra
+ * v5 — Google Apps Script legato a un Foglio Google
+ *
+ * Codice sorgente: https://github.com/UncleDan/votazione-ctl-baskin
+ * Copyright (c) 2026 Daniele Lolli (UncleDan) — Licenza MIT (vedi LICENSE)
+ * SPDX-License-Identifier: MIT
  *
  * Round 1: le squadre eleggono i commissari CTL (qualifiche, deroga aiuto
  *          allenatore, regola metà squadre min 3 max 6).
@@ -9,6 +13,7 @@
  * Formatore di riferimento: indicato senza votazione (Config); se votante
  * deve candidarsi al round 1 come Autocandidatura.
  * Report: eletti, Presidente, Vice, Formatore di riferimento.
+ * Riepilogo urna: conteggi, partecipazione e schede anonime per il custode.
  *
  * Anonimato: le schede sono salvate nelle Script Properties (non nel foglio,
  * quindi senza cronologia versioni), senza codice né orario, e inserite in
@@ -17,8 +22,9 @@
 
 const SH = {
   CONFIG: 'Config', CAND: 'Candidati', COD: 'Squadre', RIS: 'Risultati',
-  COM: 'Commissari', RP: 'Risultati Presidente', RV: 'Risultati Vice', REP: 'Report'
+  COM: 'Commissari', RP: 'Risultati Presidente', RV: 'Risultati Vice', REP: 'Report', URNA: 'Riepilogo urna'
 };
+const REPO_URL = 'https://github.com/UncleDan/votazione-ctl-baskin';
 const P_SALT = 'SALT';
 const ROUND = {
   1: { nome: 'Commissari CTL', ballots: 'BALLOTS', used: 'USED' },
@@ -52,6 +58,7 @@ function onOpen() {
     .addSeparator()
     .addItem('Aggiorna partecipazione', 'aggiornaPartecipazione')
     .addItem('Aggiorna report', 'aggiornaReport')
+    .addItem('Aggiorna riepilogo urna', 'aggiornaUrna')
     .addItem('Azzera round…', 'azzeraRound')
     .addToUi();
 }
@@ -75,6 +82,7 @@ function setup() {
   ensureSheet_(ss, SH.CONFIG, [
     ['Parametro', 'Valore', 'Note'],
     ['Titolo', 'Elezione CTL Baskin', 'Titolo della pagina di voto'],
+    ['Sezione territoriale', '', 'Es. Emilia-Romagna — compare sulla pagina di voto e nei report'],
     ['Stato', 'CHIUSA', 'APERTA / CHIUSA — usa il menu'],
     ['Max preferenze', '', 'Vuoto = metà dei candidati arrotondata per eccesso'],
     ['Numero eletti', '', 'Vuoto = regola CTL: metà delle squadre per eccesso, min 3, max 6'],
@@ -82,6 +90,7 @@ function setup() {
     ['Messaggio', 'Seleziona i candidati a cui dai la preferenza.', 'Testo sopra la scheda']
   ]);
   ensureCfgRow_('Max aiuti allenatore', 1, 'Deroga: aiuti allenatore ammessi, solo se mancano allenatori/autocandidature');
+  ensureCfgRow_('Sezione territoriale', '', 'Es. Emilia-Romagna — compare sulla pagina di voto e nei report');
   ensureCfgRow_('Round attivo', 1, 'Gestito dal menu (1 commissari, 2 presidente, 3 vice)');
   ensureCfgRow_('Formatore di riferimento', '', 'Nome, senza votazione. Se vuole essere votante va inserito anche tra i Candidati come Autocandidatura');
   ensureCfgRow_('Presidente', '', 'Compilato dal round 2; in caso di parità scrivilo a mano');
@@ -246,6 +255,7 @@ function link_(cod) {
 function chiudiVotazione() {
   setCfg_('Stato', 'CHIUSA');
   aggiornaPartecipazione();
+  aggiornaUrna();
 }
 
 function aggiornaPartecipazione() {
@@ -306,6 +316,7 @@ function calcolaRisultati() {
   const riepilogo = [
     r('', ''),
     r('Riepilogo', ''),
+    r('Sezione territoriale', sezione_(c)),
     r('Squadre aventi diritto', numSquadre_()),
     r('Schede votate', schede.length),
     r('di cui bianche', bianche),
@@ -320,6 +331,7 @@ function calcolaRisultati() {
   sh.autoResizeColumns(1, RIS_HEADER.length);
   sh.activate();
   aggiornaReport();
+  aggiornaUrna();
 }
 
 /** Round 2 e 3: una preferenza, vince chi ha più voti (spareggio per anni). */
@@ -359,7 +371,7 @@ function calcolaCarica_(r) {
   sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold').setBackground('#e8eaf6');
   sh.getRange(2, 1, out.length, head.length).setValues(out);
   const f = (a, b) => [a, b, '', '', '', '', ''];
-  const riep = [f('', ''), f('Riepilogo', ''),
+  const riep = [f('', ''), f('Riepilogo', ''), f('Sezione territoriale', sezione_(c)),
     f('Commissari aventi diritto', Object.keys(votantiMap_(r)).length),
     f('Schede votate', schede.length), f('di cui bianche', bianche),
     f('Calcolato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm'))];
@@ -369,6 +381,7 @@ function calcolaCarica_(r) {
 
   setCfg_(ROUND[r].cfg, vincitore);
   aggiornaReport();
+  aggiornaUrna();
   if (!vincitore) ui.alert('Nessun eletto (parità o nessun voto). Risolvi e scrivi il nome in Config → ' + ROUND[r].cfg + ', poi "Aggiorna report".');
 }
 
@@ -397,7 +410,8 @@ function aggiornaReport() {
 
   const R = (a, b, c3, d) => [a, b || '', c3 || '', d || ''];
   const rows = [
-    R(String(c['Titolo'] || 'Elezione CTL') + ' — Report'),
+    R(String(c['Titolo'] || 'Elezione CTL') + (sezione_(c) ? ' — Sezione territoriale ' + sezione_(c) : '') + ' — Report'),
+    R('Sezione territoriale', sezione_(c) || '(non indicata)'),
     R('Aggiornato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm')),
     R(''),
     R('Presidente', pres || '(da eleggere)'),
@@ -417,7 +431,8 @@ function aggiornaReport() {
 
   sh.getRange(1, 1, rows.length, 4).setValues(rows);
   sh.getRange(1, 1).setFontWeight('bold').setFontSize(14);
-  sh.getRange(4, 1, 4, 1).setFontWeight('bold');
+  sh.getRange(5, 1, 4, 1).setFontWeight('bold');
+  sh.getRange(rows.length + 2, 1).setValue('Codice sorgente aperto (licenza MIT): ' + REPO_URL).setFontSize(9);
   sh.getRange(headRow, 1, 1, 4).setFontWeight('bold').setBackground('#e8eaf6');
   sh.autoResizeColumns(1, 4);
 }
@@ -470,6 +485,77 @@ function assegna_(lista, posti, maxAiuti) {
   return { esito: esito, vacanti: Math.max(posti - daA - daB, 0), parita: parita };
 }
 
+/* ---------------- Riepilogo per il custode dell'urna ---------------- */
+
+/**
+ * Per ogni round: aventi diritto, chi ha votato, controllo di coerenza
+ * (schede nell'urna = codici usati), bianche, preferenze per candidato e
+ * elenco delle schede anonime (ordine casuale, nessun legame col votante).
+ * A round APERTO mostra solo partecipazione e numero di schede: i conteggi
+ * compaiono dopo la chiusura.
+ */
+function aggiornaUrna() {
+  const ss = SpreadsheetApp.getActive();
+  const c = cfg_();
+  const sh = ss.getSheetByName(SH.URNA) || ss.insertSheet(SH.URNA);
+  sh.clear();
+  const W = 4;
+  const R = function () { const a = Array.prototype.slice.call(arguments); while (a.length < W) a.push(''); return a.slice(0, W); };
+  const rows = [], bold = [], head = [];
+  const push = (row, tipo) => { rows.push(row); if (tipo === 'b') bold.push(rows.length); if (tipo === 'h') head.push(rows.length); };
+
+  push(R('Riepilogo per il custode dell\'urna — ' + String(c['Titolo'] || 'Elezione CTL')), 'b');
+  push(R('Sezione territoriale', sezione_(c) || '(non indicata)'));
+  push(R('Aggiornato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm')));
+  push(R('Stato', 'Round ' + roundAttivo_(c) + ' – ' + ROUND[roundAttivo_(c)].nome + ': ' + (aperta_(c) ? 'APERTO' : 'CHIUSO')));
+
+  [1, 2, 3].forEach(r => {
+    const votanti = r === 1
+      ? (function () { const m = codiciMap_(); return Object.keys(m).map(k => ({ nome: m[k], codice: k })); })()
+      : commissari_().filter(x => norm_(x.codice)).map(x => ({ nome: x.nome, codice: norm_(x.codice) }));
+    const used = new Set(usati_(r));
+    const schede = schede_(r);
+    const hanno = votanti.filter(v => used.has(hash_(v.codice))).map(v => v.nome);
+    const nonHanno = votanti.filter(v => !used.has(hash_(v.codice))).map(v => v.nome);
+    const inCorso = aperta_(c) && roundAttivo_(c) === r;
+
+    push(R(''));
+    push(R('Round ' + r + ' – ' + ROUND[r].nome + (inCorso ? ' (IN CORSO)' : '')), 'h');
+    if (!votanti.length && !schede.length) { push(R('Non ancora preparato.')); return; }
+    push(R('Aventi diritto', votanti.length));
+    push(R('Hanno votato (codici usati)', used.size));
+    push(R('Schede nell\'urna', schede.length,
+      schede.length === used.size ? 'Controllo OK: schede = codici usati' : 'ANOMALIA: schede e codici usati non coincidono'));
+    push(R('Hanno votato', hanno.join(', ') || '—'));
+    push(R('Non hanno votato', nonHanno.join(', ') || '—'));
+    if (inCorso) { push(R('Conteggi e schede visibili dopo la chiusura del round.')); return; }
+
+    const bianche = schede.filter(s => !s.length).length;
+    push(R('Schede bianche', bianche));
+    const nomi = candidatiRound_(r, c).map(x => x.nome);
+    const voti = {};
+    nomi.forEach(n => voti[n] = 0);
+    schede.forEach(s => s.forEach(n => { voti[n] = (voti[n] || 0) + 1; }));
+    const tot = Object.keys(voti).reduce((a, k) => a + voti[k], 0);
+    push(R('Preferenze espresse', tot));
+    push(R('Candidato', 'Preferenze', 'Nota'), 'b');
+    Object.keys(voti).sort((a, b) => voti[b] - voti[a] || a.localeCompare(b, 'it'))
+      .forEach(n => push(R(n, voti[n], nomi.indexOf(n) < 0 ? 'Non più presente tra i candidati' : '')));
+    push(R('Scheda n. (ordine casuale)', 'Preferenze'), 'b');
+    schede.forEach((s, i) => push(R(i + 1, s.length ? s.join(', ') : '(bianca)')));
+  });
+
+  push(R(''));
+  push(R('Le schede non contengono né codice, né votante, né orario: l\'ordine è casuale e non corrisponde all\'ordine di voto.'));
+  push(R('Codice sorgente aperto (licenza MIT): ' + REPO_URL));
+
+  sh.getRange(1, 1, rows.length, W).setValues(rows);
+  sh.getRange(1, 1).setFontSize(14);
+  bold.forEach(i => sh.getRange(i, 1, 1, W).setFontWeight('bold'));
+  head.forEach(i => sh.getRange(i, 1, 1, W).setFontWeight('bold').setBackground('#e8eaf6'));
+  sh.autoResizeColumns(1, W);
+}
+
 function azzeraRound() {
   const ui = SpreadsheetApp.getUi();
   const p = ui.prompt('Azzera round', 'Quale round azzerare? Scrivi 1, 2, 3 oppure TUTTI.\nLe schede cancellate non si recuperano.', ui.ButtonSet.OK_CANCEL);
@@ -502,6 +588,7 @@ function azzeraRound() {
     setCfg_('Round attivo', 1);
   }
   aggiornaReport();
+  aggiornaUrna();
   ui.alert('Azzerato: round ' + rounds.join(', ') + '. I codici esistenti restano validi.');
 }
 
@@ -522,6 +609,8 @@ function getInfo() {
   const titolo = String(c['Titolo'] || 'Votazione');
   return {
     round: r,
+    sezione: sezione_(c),
+    repo: REPO_URL,
     titolo: r === 1 ? titolo : titolo + ' — ' + ROUND[r].nome,
     sottotitolo: r === 1 ? 'Voto anonimo — una scheda per squadra' : 'Voto anonimo — una scheda per commissario',
     messaggio: r === 1 ? String(c['Messaggio'] || '')
@@ -600,6 +689,8 @@ function setCfg_(key, val) {
   if (i >= 0) sh.getRange(i + 2, 2).setValue(val);
   else sh.appendRow([key, val, '']);
 }
+
+function sezione_(c) { return String(c['Sezione territoriale'] || '').trim(); }
 
 function aperta_(c) { return String(c['Stato']).trim().toUpperCase() === 'APERTA'; }
 
