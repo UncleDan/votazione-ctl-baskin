@@ -26,6 +26,7 @@ function daTrigger(fn) {
 
 // ---------------- Preparazione ----------------
 setup();
+setCfg_('Interfaccia di voto', 'Semplice');   // questa simulazione prova la porta "app Google"
 setCfg_('Sezione Territoriale', 'Emilia-Romagna');
 setCfg_('Anno sportivo', '2026/2027');
 const squadre = [];

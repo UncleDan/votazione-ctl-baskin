@@ -28,6 +28,10 @@
   ul.r { padding-left:20px; margin:0 0 10px; }
   .ok { color:var(--ok); font-size:3rem; line-height:1; margin-bottom:8px; }
   .note { color:var(--muted); font:13px/1.4 system-ui, sans-serif; margin-top:18px; }
+  .ric { margin-top:18px; border:2px solid var(--accent); border-radius:8px; background:#eef3fb; padding:20px 14px; text-align:center; }
+  .ric-l { font:600 12px system-ui, sans-serif; letter-spacing:1.4px; text-transform:uppercase; color:var(--accent); margin:0; }
+  .ric-v { font:700 clamp(32px,10vw,46px)/1.1 ui-monospace, Menlo, monospace; letter-spacing:2px; margin:10px 0 0; word-break:break-all; user-select:all; }
+  .ric-i { margin:16px 0 0; font:15px/1.5 system-ui, sans-serif; }
   .logo { display:block; height:96px; width:auto; max-width:100%; margin:0 auto 14px; }
   .sez { font:600 14px system-ui, sans-serif; color:var(--accent); margin:0 0 6px; }
   footer { max-width:520px; margin:0 auto; padding:0 14px 30px; color:var(--muted); font:12px/1.5 system-ui, sans-serif; text-align:center; }
@@ -44,7 +48,7 @@
 
     <section id="s-load"><p>Caricamento…</p></section>
 
-    <section id="s-closed" hidden><p>La votazione al momento non è aperta.</p><p class="note" id="prog-closed" hidden></p></section>
+    <section id="s-closed" hidden><p id="chiusa-txt">La votazione al momento non è aperta.</p><p class="note" id="prog-closed" hidden></p></section>
 
     <section id="s-code" hidden>
       <label class="f" for="codice">Codice personale</label>
@@ -77,6 +81,16 @@
       <div class="ok">✓</div>
       <p><strong>Voto registrato.</strong></p>
       <p id="done-soc"></p>
+      <div class="ric" id="box-ric" hidden>
+        <p class="ric-l">La tua ricevuta di voto</p>
+        <p class="ric-v" id="done-ric"></p>
+        <p class="ric-i"><strong>Fai subito uno screenshot di questa schermata</strong>, oppure
+        trascrivi la ricevuta su un foglio. Non la si può recuperare: chiusa questa pagina,
+        non la conosce più nessuno, nemmeno il Coordinatore.</p>
+      </div>
+      <p class="note" id="note-ric" hidden>A spoglio concluso la ricevuta comparirà nel riepilogo
+      dell'urna: ritrovarla significa che la tua scheda è stata contata. Non dice come hai votato,
+      ed è proprio per questo che il voto resta anonimo.</p>
       <p class="note">Puoi chiudere questa pagina.</p>
     </section>
   </div>
@@ -89,6 +103,30 @@
 </footer>
 
 <script>
+  /* Freno ai tentativi a vuoto: tre codici sbagliati e il voto da questo
+     dispositivo resta sospeso un'ora. Il conteggio sta in una memoria tecnica del
+     browser, non esce di li e non traccia nessuno. E un freno, non una difesa:
+     chi svuota i dati del sito riparte. La difesa vera e la lunghezza del codice. */
+  var MAX_TENTATIVI = 3, ATTESA_MS = 60 * 60 * 1000, CHIAVE_TENT = 'ctl-tentativi';
+  function tentStato() { try { return JSON.parse(localStorage.getItem(CHIAVE_TENT) || '{}'); } catch (e) { return {}; } }
+  function tentSalva(s) { try { localStorage.setItem(CHIAVE_TENT, JSON.stringify(s)); } catch (e) {} }
+  function tentBloccoFino() { var s = tentStato(); return (s.fino && s.fino > Date.now()) ? s.fino : 0; }
+  function tentMinuti(f) { return Math.max(1, Math.ceil((f - Date.now()) / 60000)); }
+  function tentErrore() {
+    var s = tentStato();
+    s.n = (s.n || 0) + 1;
+    if (s.n >= MAX_TENTATIVI) { s.fino = Date.now() + ATTESA_MS; s.n = 0; }
+    tentSalva(s);
+  }
+  function tentAzzera() { tentSalva({}); }
+  function aggiornaBlocco() {
+    var f = tentBloccoFino();
+    $('b-verifica').disabled = !!f;
+    if (f) $('m-code').textContent = 'Codice sbagliato tre volte: per sicurezza il voto da questo dispositivo ' +
+      'riprende fra ' + tentMinuti(f) + ' minuti. Se non trovi il codice, chiedilo al Coordinatore della Sezione Tecnica.';
+    return !!f;
+  }
+
   var INFO = null, CODE = '';
   var $ = function (id) { return document.getElementById(id); };
   var SEZ = ['s-load', 's-closed', 's-code', 's-vote', 's-confirm', 's-done'];
@@ -111,14 +149,17 @@
         $('prog-open').textContent = i.programma;
         $('prog-open').hidden = false;
       }
+      if (i.avviso) { $('chiusa-txt').textContent = i.avviso; $('prog-closed').hidden = true; }
       if (!i.aperta) return show('s-closed');
       show('s-code');
+      if (aggiornaBlocco()) return;
       if ($('codice').value.trim()) verifica();
     })
     .withFailureHandler(function (e) { $('s-load').textContent = 'Impossibile caricare la votazione: ' + (e && e.message || e); })
     .getInfo();
 
   function verifica() {
+    if (aggiornaBlocco()) return;
     var c = $('codice').value.trim();
     $('m-code').textContent = '';
     if (!c) { $('m-code').textContent = 'Inserisci il codice.'; return; }
@@ -126,7 +167,12 @@
     google.script.run
       .withSuccessHandler(function (r) {
         busy(false);
-        if (!r.ok) { $('m-code').textContent = r.err; return; }
+        if (!r.ok) {
+          if (r.motivo === 'codice') { tentErrore(); if (aggiornaBlocco()) return; }
+          $('m-code').textContent = r.err;
+          return;
+        }
+        tentAzzera();
         CODE = c;
         $('soc').textContent = INFO.prefisso + r.votante;
         $('done-soc').textContent = r.votante;
@@ -143,7 +189,7 @@
     lista.innerHTML = '';
     var aiuti = INFO.candidati.some(function (x) { return /aiuto/i.test(x.qualifica); });
     $('deroga').hidden = !aiuti || !INFO.maxAiuti;
-    $('deroga').textContent = 'Gli aiuti allenatore entrano in commissione solo se allenatori e autocandidature non bastano a coprire i posti (massimo ' + INFO.maxAiuti + ').';
+    $('deroga').textContent = 'Gli aiuto allenatore entrano in commissione solo se non bastano gli altri candidati a coprire i posti (massimo ' + INFO.maxAiuti + ').';
     INFO.candidati.forEach(function (x, i) {
       var l = document.createElement('label');
       l.className = 'cand';
@@ -192,6 +238,11 @@
         busy(false);
         if (!r.ok) { $('m-invio').textContent = r.err; return; }
         CODE = '';
+        if (r.ricevuta) {
+          $('done-ric').textContent = r.ricevuta;
+          $('box-ric').hidden = false;
+          $('note-ric').hidden = false;
+        }
         show('s-done');
       })
       .withFailureHandler(fail('m-invio'))
@@ -203,6 +254,7 @@
   $('b-riepilogo').addEventListener('click', riepilogo);
   $('b-indietro').addEventListener('click', function () { show('s-vote'); });
   $('b-invia').addEventListener('click', invia);
+  setInterval(function () { if (!$('s-code').hidden) aggiornaBlocco(); }, 20000);
 </script>
 </body>
 </html>

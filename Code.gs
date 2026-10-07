@@ -31,33 +31,41 @@
 const SH = {
   CONFIG: 'Config', SOC: 'Società', SQ: 'Squadre', CAND: 'Candidati', RIS: 'Risultati',
   COM: 'Commissari', BAL: 'Ballottaggio', RB: 'Risultati ballottaggi',
-  RP: 'Risultati Presidente', RV: 'Risultati Vice', REP: 'Report', URNA: 'Riepilogo urna'
+  RP: 'Risultati Presidente', RV: 'Risultati Vice', REP: 'Report', URNA: 'Riepilogo urna',
+  MSG: 'Messaggi'
 };
 const REPO_URL = 'https://github.com/UncleDan/votazione-ctl-baskin';
-const VERSIONE = 'v9';
+const VERSIONE = 'v17';
 const LOGO_SVG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg';
 const LOGO_PNG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png';
 const PROPRIETA_LOGO = 'Logo © Ente Italiano Sport Inclusivi (EISI), tutti i diritti riservati';
 const P_SALT = 'SALT';
 const MAX_BALLOTTAGGI = 3;
 const ROUND = {
-  1: { nome: 'Commissari CTL', ballots: 'BALLOTS', used: 'USED', prefisso: 'Stai votando per la società: ' },
-  2: { nome: 'Presidente CTL', ballots: 'BALLOTS_2', used: 'USED_2', ris: SH.RP, col: 'Votato Presidente', cfg: 'Presidente', prefisso: 'Stai votando come: ' },
-  3: { nome: 'Vice CTL', ballots: 'BALLOTS_3', used: 'USED_3', ris: SH.RV, col: 'Votato Vice', cfg: 'Vice', prefisso: 'Stai votando come: ' }
+  1: { nome: 'Commissari CTL', ballots: 'BALLOTS', used: 'USED', ric: 'RIC', prefisso: 'Stai votando per la società: ' },
+  2: { nome: 'Presidente CTL', ballots: 'BALLOTS_2', used: 'USED_2', ric: 'RIC_2', ris: SH.RP, col: 'Votato Presidente', cfg: 'Presidente', prefisso: 'Stai votando come: ' },
+  3: { nome: 'Vice CTL', ballots: 'BALLOTS_3', used: 'USED_3', ric: 'RIC_3', ris: SH.RV, col: 'Votato Vice', cfg: 'Vice', prefisso: 'Stai votando come: ' }
 };
-const SOC_HEADER = ['Società', 'Codice', 'Link diretto di voto', 'Ha votato'];
+const SOC_HEADER = ['Società', 'Codice', 'Link diretto di voto', 'Ha votato', 'Nome breve'];
 const SQ_HEADER = ['Squadra', 'Società'];
 const CAND_HEADER = ['Candidato', 'Qualifica', 'Squadra', 'Anni tesseramento/incarichi (spareggio)', 'Note'];
 const COM_HEADER = ['Commissario', 'Qualifica', 'Squadra', 'Codice', 'Link diretto di voto', 'Votato Presidente', 'Votato Vice'];
 const BAL_HEADER = ['Votante', 'Codice ballottaggio', 'Link diretto di voto', 'Ha votato'];
 const RIS_HEADER = ['Posizione', 'Candidato', 'Qualifica', 'Squadra', 'Preferenze', 'Anni (spareggio)', 'Esito', 'Note'];
+const MSG_HEADER = ['Destinatario', 'Codice', 'Messaggio da copiare e incollare'];
 const LETTERE = 'ABCDEFGH';      // codici: 4 lettere A–H
 const CIFRE = '0123456789';      // + 4 cifre, nel formato XXXX-9999
 const FUSO = 'Europe/Rome';
 const TRIGGER_FN = ['triggerApreCommissari', 'triggerChiudeCommissari', 'triggerAprePresidente', 'triggerChiudePresidente', 'triggerChiudeBallottaggio'];
 const LOG_ = [];                 // messaggi raccolti quando si lavora senza interfaccia (trigger)
-const QUALIFICHE = ['Allenatore', 'Aiuto allenatore', 'Autocandidatura'];
+const QUALIFICHE = ['Allenatore', 'Aiuto allenatore', 'Altro'];
+// L'autocandidatura non e una qualifica ma un modo di arrivare in lista: si indica
+// al posto della squadra, per chi si candida da se e non e tesserato con un club.
+const AUTOCAND = 'Autocandidatura';
 const BLU = '#e8eaf6';
+const INTERFACCE = ['Semplice', 'HTML'];   // una sola attiva per votazione
+const CFG_INTERFACCIA = 'Interfaccia di voto';
+const CFG_URL_HTML = 'Indirizzo interfaccia HTML';
 
 /* ================= Menu ================= */
 
@@ -91,11 +99,20 @@ function onOpen() {
       .addItem('Programma apertura e chiusura', 'programmaVotazioni')
       .addItem('Mostra pianificazione', 'mostraPianificazione')
       .addItem('Annulla pianificazione', 'annullaPianificazione'))
+    .addItem('Prepara i messaggi per i votanti', 'preparaMessaggiMenu')
+    .addSubMenu(ui.createMenu('Interfaccia di voto')
+      .addItem('Usa la app Google (semplice)', 'usaInterfacciaSemplice')
+      .addItem('Usa la pagina web (HTML)…', 'usaInterfacciaHtml')
+      .addItem('Mostra interfaccia attiva e indirizzi', 'mostraInterfaccia'))
     .addSeparator()
     .addItem('Aggiorna partecipazione', 'aggiornaPartecipazione')
     .addItem('Aggiorna report', 'aggiornaReport')
     .addItem('Aggiorna riepilogo urna', 'aggiornaUrna')
-    .addItem('Azzera round…', 'azzeraRound')
+    .addSubMenu(ui.createMenu('Azzeramenti')
+      .addItem('Solo i risultati, stessi codici…', 'azzeraRisultati')
+      .addItem('Un round solo…', 'azzeraRound')
+      .addItem('Tutto, per una nuova elezione…', 'azzeraTutto')
+      .addItem('Tutto e riempi con dati di prova…', 'inizializzaDatiProva'))
     .addToUi();
 }
 
@@ -167,9 +184,9 @@ function setup() {
     ['Ballottaggio', 0, 'Gestito dal menu (0 = nessuno, altrimenti numero del ballottaggio in corso)'],
     ['Max preferenze', '', 'Vuoto = metà dei candidati arrotondata per eccesso'],
     ['Numero eletti', '', 'Vuoto = regola CTL: metà delle società per eccesso, min 3, max 6'],
-    ['Max aiuti allenatore', 1, 'Deroga: aiuti allenatore ammessi, solo se mancano allenatori/autocandidature'],
+    ['Max aiuti allenatore', 1, 'Deroga: aiuti allenatore ammessi, solo se non bastano gli altri candidati'],
     ['Messaggio', 'Seleziona i candidati a cui dai la preferenza.', 'Testo sopra la scheda (round 1)'],
-    ['Formatore di riferimento', '', 'Nome, senza votazione. Se vuole essere votante va inserito anche tra i Candidati come Autocandidatura'],
+    ['Formatore di riferimento', '', 'Nome, senza votazione. Se vuole essere votante va inserito anche tra i Candidati, con "' + AUTOCAND + '" al posto della squadra'],
     ['Presidente', '', 'Compilato dal round 2; parità non risolte: scrivilo a mano'],
     ['Vice', '', 'Compilato dal round 3; parità non risolte: scrivilo a mano'],
     ['Apertura voto commissari', '', 'Data e ora (gg/mm/aaaa hh:mm). Vuoto = apertura manuale'],
@@ -180,8 +197,12 @@ function setup() {
     ['Proroga automatica (ore)', 24, 'Se alla chiusura programmata manca qualche voto, la votazione resta aperta ancora per queste ore'],
     ['Email avvisi', '', 'Dove inviare gli avvisi delle votazioni programmate. Vuoto = indirizzo del proprietario del foglio'],
     ['Logo pagina web', LOGO_SVG, 'URL del logo sulla pagina di voto (hotlinking, SVG o PNG). Vuoto = nessun logo'],
-    ['Logo fogli (PNG)', LOGO_PNG, 'URL del logo nei resoconti: i fogli Google non mostrano SVG, serve PNG/JPG. Vuoto = nessun logo']
+    ['Logo fogli (PNG)', LOGO_PNG, 'URL del logo nei resoconti: i fogli Google non mostrano SVG, serve PNG/JPG. Vuoto = nessun logo'],
+    [CFG_INTERFACCIA, 'HTML', 'Da dove si vota: Semplice = app Google; HTML = pagina su GitHub Pages. Una sola per votazione, gestita dal menu'],
+    [CFG_URL_HTML, '', 'Indirizzo della pagina su GitHub Pages. Serve solo con l\'interfaccia HTML: entra nei link inviati ai votanti']
   ].forEach(r => ensureCfgRow_(r[0], r[1], r[2]));
+  cfgCell_(CFG_INTERFACCIA).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireValueInList(INTERFACCE, true).setAllowInvalid(false).build());
   cfgCell_('Anno sportivo').setNumberFormat('@');  // testo: "2026/27" non diventa una data
   ['Apertura voto commissari', 'Chiusura voto commissari', 'Apertura voto presidente', 'Chiusura voto presidente']
     .forEach(k => cfgCell_(k).setNumberFormat('dd/mm/yyyy hh:mm'));
@@ -195,6 +216,13 @@ function setup() {
   }
   ensureSheet_(ss, SH.COM, COM_HEADER);
   ensureSheet_(ss, SH.RIS, RIS_HEADER);
+  ensureSheet_(ss, SH.MSG, MSG_HEADER);
+  const brevi = riempiNomiBrevi_();
+  if (brevi) avvisi.push(brevi + ' societa senza "Nome breve": per ora vale la ragione sociale. ' +
+    'Accorcialo nel foglio "Societa" (ultima colonna): e il nome che vedono i votanti, nei messaggi e nei resoconti.');
+  const spostate = migraAutocandidature_();
+  if (spostate) avvisi.push(spostate + ' candidati avevano "' + AUTOCAND + '" come qualifica: ora la qualifica e "Altro" e ' +
+    '"' + AUTOCAND + '" sta nella colonna Squadra, per chi non e tesserato con un club. Controlla il foglio "Candidati".');
 
   applicaValidazioni_();
   const props = PropertiesService.getScriptProperties();
@@ -206,6 +234,61 @@ function setup() {
     '2) "Squadre": squadra e società di appartenenza.\n' +
     '3) "Candidati": nome, qualifica, squadra, anni.\n' +
     '4) Round 1 → "Genera codici e link mancanti".' + (avvisi.length ? '\n\n' + avvisi.join('\n\n') : ''));
+}
+
+/**
+ * Dalla v10 "Autocandidatura" non e piu una qualifica: la qualifica dice che cosa
+ * e il candidato (Allenatore, Aiuto allenatore, Altro) e l'autocandidatura prende
+ * il posto della squadra, per chi si candida da se senza essere tesserato.
+ * Converte le righe vecchie e restituisce quante ne ha toccate.
+ */
+/** Riempie i "Nome breve" vuoti con la ragione sociale e dice quanti ne ha riempiti. */
+function riempiNomiBrevi_() {
+  const sh = sheet_(SH.SOC);
+  if (sh.getLastRow() < 2) return 0;
+  const n = sh.getLastRow() - 1;
+  const rag = sh.getRange(2, 1, n, 1).getValues();
+  const br = sh.getRange(2, 5, n, 1).getValues();
+  let q = 0;
+  rag.forEach((r, i) => {
+    if (String(r[0]).trim() && !String(br[i][0]).trim()) { br[i][0] = String(r[0]).trim(); q++; }
+  });
+  if (q) sh.getRange(2, 5, n, 1).setValues(br);
+  return q;
+}
+
+function migraAutocandidature_() {
+  const sh = sheet_(SH.CAND);
+  if (sh.getLastRow() < 2) return 0;
+  const h = headers_(sh);
+  if (!h.qualifica || !h.squadra) return 0;
+  const n = sh.getLastRow() - 1;
+  const q = sh.getRange(2, h.qualifica, n, 1).getValues();
+  const s = sh.getRange(2, h.squadra, n, 1).getValues();
+  let tocchi = 0;
+  q.forEach((r, i) => {
+    if (!/autocand/i.test(String(r[0]))) return;
+    r[0] = 'Altro';
+    if (!String(s[i][0]).trim()) s[i][0] = AUTOCAND;
+    tocchi++;
+  });
+  if (tocchi) {
+    sh.getRange(2, h.qualifica, n, 1).setValues(q);
+    sh.getRange(2, h.squadra, n, 1).setValues(s);
+  }
+  return tocchi;
+}
+
+/** Svuota un foglio e rimette la riga di intestazione (clearContents la porta via). */
+function svuotaFoglio_(ss, name, header) {
+  const sh = ss.getSheetByName(name);
+  if (!sh) return ensureSheet_(ss, name, header);
+  sh.clearContents();
+  if (header && header.length) {
+    sh.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight('bold').setBackground(BLU);
+    sh.setFrozenRows(1);
+  }
+  return sh;
 }
 
 function ensureSheet_(ss, name, header) {
@@ -239,8 +322,10 @@ function applicaValidazioni_() {
   const n = Math.max(cand.getMaxRows() - 1, 1);
   cand.getRange(2, h.qualifica, n, 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireValueInList(QUALIFICHE, true).setAllowInvalid(false).build());
+  // la squadra del candidato: una di quelle iscritte, oppure "Autocandidatura"
+  const elencoSq = colonna_(sq, 1).concat([AUTOCAND]);
   cand.getRange(2, h.squadra, n, 1).setDataValidation(
-    SpreadsheetApp.newDataValidation().requireValueInRange(sq.getRange('A2:A'), true).setAllowInvalid(true).build());
+    SpreadsheetApp.newDataValidation().requireValueInList(elencoSq, true).setAllowInvalid(true).build());
   sq.getRange(2, 2, Math.max(sq.getMaxRows() - 1, 1), 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireValueInRange(soc.getRange('A2:A'), true).setAllowInvalid(true).build());
 }
@@ -259,7 +344,7 @@ function assegnaCodiciMancanti_(tutti) {
   squadre_().forEach(x => {
     if (x.societa && !presenti.has(x.societa.toLowerCase())) {
       presenti.add(x.societa.toLowerCase());
-      soc.appendRow([x.societa, '', '', '']);
+      soc.appendRow([x.societa, '', '', '', x.societa]);
     }
   });
   const n = soc.getLastRow() - 1;
@@ -283,6 +368,7 @@ function generaCodici() {
   if (!sheet_(SH.SOC).getLastRow() || numSocieta_() + squadre_().length === 0)
     return ui.alert('Inserisci le società nel foglio "Società" (o la società di ogni squadra in "Squadre").');
   const nuovi = assegnaCodiciMancanti_(false);
+  messaggiSicuro_();
   ui.alert(nuovi + ' nuovi codici generati; link aggiornati per tutte le società (codici esistenti e voti già espressi restano validi).' +
     '\nSocietà aventi diritto: ' + numSocieta_() + ' → commissari da eleggere: ' + posti_(cfg_()) + '.' +
     (link_('X') ? '\n\nInvia a ogni società solo il SUO link.'
@@ -345,10 +431,253 @@ function codiciEsistenti_() {
   return s;
 }
 
-function link_(cod) {
-  let url = '';
-  try { url = ScriptApp.getService().getUrl() || ''; } catch (e) {}
-  return url ? url + '?c=' + norm_(cod) : '';
+/* ================= Interfaccia di voto attiva ================= */
+
+/** 'HTML' se si vota dalla pagina statica, 'SEMPLICE' se dalla app Google. */
+function interfaccia_(c) {
+  return String((c || cfg_())[CFG_INTERFACCIA] || 'HTML').trim().toUpperCase() === 'SEMPLICE' ? 'SEMPLICE' : 'HTML';
+}
+
+function urlHtml_(c) { return String((c || cfg_())[CFG_URL_HTML] || '').trim().replace(/\/+$/, ''); }
+
+function urlApp_() {
+  try { return ScriptApp.getService().getUrl() || ''; } catch (e) { return ''; }
+}
+
+/**
+ * Controlla che la scheda arrivi dall'ingresso attivo. Restituisce null se va bene,
+ * altrimenti il messaggio da mostrare, con l'indirizzo giusto quando lo conosciamo.
+ * Il controllo sta qui, dal lato che scrive: un vecchio link non deve poter votare
+ * dalla porta chiusa.
+ */
+function guardiaIngresso_(c, origine) {
+  const attiva = interfaccia_(c);
+  if ((origine === 'html' ? 'HTML' : 'SEMPLICE') === attiva) return null;
+  if (attiva === 'HTML') {
+    const u = urlHtml_(c);
+    return 'Per questa votazione si vota dalla pagina web' + (u ? ': ' + u : ' indicata dal Coordinatore.');
+  }
+  const u = urlApp_();
+  return 'Per questa votazione si vota dall\'app Google' + (u ? ': ' + u : ' indicata dal Coordinatore.');
+}
+
+/** Link personale del votante, verso l'ingresso attivo. */
+function link_(cod, c) {
+  const n = norm_(cod);
+  if (!n) return '';
+  const cfg = c || cfg_();
+  if (interfaccia_(cfg) === 'HTML') {
+    const u = urlHtml_(cfg);
+    return u ? u + '#c=' + n : '';
+  }
+  const u = urlApp_();
+  return u ? u + '?c=' + n : '';
+}
+
+/** Riscrive i link di società, commissari e ballottaggio senza toccare i codici. */
+function aggiornaLink_() {
+  const ss = SpreadsheetApp.getActive(), c = cfg_();
+  let n = 0;
+  [[SH.SOC, 2, 3], [SH.COM, 4, 5], [SH.BAL, 2, 3]].forEach(t => {
+    const sh = ss.getSheetByName(t[0]);
+    if (!sh || sh.getLastRow() < 2) return;
+    const righe = sh.getLastRow() - 1;
+    const cod = sh.getRange(2, t[1], righe, 1).getValues();
+    sh.getRange(2, t[2], righe, 1).setValues(cod.map(r => { const l = link_(r[0], c); if (l) n++; return [l]; }));
+  });
+  return n;
+}
+
+/* ================= Messaggi per i votanti ================= */
+
+function preparaMessaggiMenu() {
+  const n = preparaMessaggi();
+  ui_().alert(n
+    ? n + ' messaggi pronti nel foglio "Messaggi".\n\nUna riga per votante: copia la cella della terza ' +
+      'colonna e incollala nella chat. Il link dentro il messaggio e gia quello personale.'
+    : 'Nessun votante per il round attivo: genera prima i codici (o prepara i commissari).');
+}
+
+/**
+ * Prepara il foglio "Messaggi": una riga per votante del round attivo, con il
+ * testo gia pronto in una sola cella. Si copia la cella e si incolla nella chat
+ * della societa, senza doverlo ricomporre ogni volta.
+ */
+function preparaMessaggi() {
+  const ss = SpreadsheetApp.getActive(), c = cfg_();
+  const x = contesto_(c);
+  const map = votantiMap_(x.r, x.b);
+  const sh = svuotaFoglio_(ss, SH.MSG, MSG_HEADER);
+  const righe = Object.keys(map).sort((a, b) => map[a].localeCompare(map[b], 'it'))
+    .map(k => [map[k], formattaCodice_(k), testoMessaggio_(c, x, map[k], k)]);
+  if (righe.length) sh.getRange(2, 1, righe.length, 3).setValues(righe);
+  sh.setColumnWidth(1, 220); sh.setColumnWidth(2, 110); sh.setColumnWidth(3, 620);
+  if (righe.length) sh.getRange(2, 3, righe.length, 1).setWrap(true).setVerticalAlignment('top');
+  return righe.length;
+}
+
+/** Il codice come lo vede chi lo riceve: XXXX-9999. */
+function formattaCodice_(k) {
+  const n = norm_(k);
+  return n.length > 4 ? n.slice(0, 4) + '-' + n.slice(4) : n;
+}
+
+/** Testo del messaggio: tutto quello che serve al votante, niente di più. */
+function testoMessaggio_(c, x, nome, codice) {
+  const titolo = String(c['Titolo'] || 'Elezione CTL Baskin');
+  const dove = intestazione_(c);
+  const link = link_(codice, c);
+  const quando = testoProgramma_(c);
+  const soc = x.r === 1 && !x.b;
+  const cosa = x.b
+    ? 'il ballottaggio per ' + ROUND[x.r].nome.replace(' CTL', ' della CTL')
+    : (x.r === 1 ? 'i Commissari della CTL' : 'il ' + ROUND[x.r].nome.replace(' CTL', ' della CTL'));
+  const r = [];
+  r.push(titolo + (dove ? ' — ' + dove : ''));
+  r.push('');
+  r.push('Ciao ' + nome + ', si vota per ' + cosa + '.');
+  r.push('');
+  r.push(soc ? 'Questo è il link riservato alla vostra società:' : 'Questo è il tuo link personale:');
+  r.push(link || '(link non disponibile: pubblica la app web, poi rigenera i messaggi)');
+  r.push('');
+  r.push('Il codice è ' + formattaCodice_(codice) + ', già compreso nel link. Serve solo a garantire ' +
+    'un voto per ' + (soc ? 'società' : 'commissario') + ': la scheda viene registrata senza codice, ' +
+    'senza nome e senza orario.');
+  r.push('');
+  r.push((x.max === 1 ? 'Si esprime una sola preferenza.' :
+    'Si possono esprimere fino a ' + x.max + ' preferenze, e l\'ordine non conta.') +
+    ' Si vota una volta sola: il codice non si riusa.');
+  if (quando) r.push(quando);
+  r.push('');
+  r.push('IMPORTANTE — Dopo aver depositato la scheda compare una RICEVUTA, un codice tipo 7K2M-94QD. ' +
+    (soc ? 'Fatele' : 'Falle') + ' subito uno screenshot, oppure ' + (soc ? 'trascrivetela' : 'trascrivila') +
+    ': non è recuperabile, chiusa la pagina non la conosce più nessuno. A spoglio concluso ' +
+    (soc ? 'la ritroverete' : 'la ritroverai') + ' nel riepilogo dell\'urna, e vorrà dire che ' +
+    (soc ? 'la vostra scheda è' : 'la tua scheda è') + ' stata contata. La ricevuta non dice come ' +
+    (soc ? 'avete' : 'hai') + ' votato: è proprio questo che tiene il voto anonimo.');
+  r.push('');
+  r.push('Il programma è pubblico e verificabile da chiunque: ' + REPO_URL);
+  return r.join('\n');
+}
+
+/* ================= Dati di prova ================= */
+
+/**
+ * Riempie i fogli con societa, squadre e candidati inventati, ma negli stessi
+ * numeri della Sezione Territoriale Emilia-Romagna 2026/2027: 11 societa,
+ * 16 squadre, 13 candidati (9 allenatori e 4 aiuto allenatore, di cui uno
+ * autocandidato senza squadra), due societa senza candidati. Serve per provare
+ * il giro completo senza toccare i dati veri.
+ * I nomi sono dell'alfabeto fonetico: nessuna persona e nessun club reale.
+ */
+const PROVA_SQUADRE = [
+  ['Alfa 1', 'Baskin Alfa'], ['Alfa 2', 'Baskin Alfa'], ['Alfa 3', 'Baskin Alfa'],
+  ['Bravo', 'Baskin Bravo'],
+  ['Charlie 1', 'Baskin Charlie'], ['Charlie 2', 'Baskin Charlie'],
+  ['Delta 1', 'Baskin Delta'], ['Delta 2', 'Baskin Delta'],
+  ['Echo 1', 'Baskin Echo'], ['Echo 2', 'Baskin Echo'],
+  ['Foxtrot', 'Baskin Foxtrot'], ['Golf', 'Baskin Golf'], ['Hotel', 'Baskin Hotel'],
+  ['India', 'Baskin India'], ['Juliett', 'Baskin Juliett'], ['Kilo', 'Baskin Kilo']
+];
+const PROVA_CANDIDATI = [
+  ['Candidato A', 'Aiuto allenatore', 'Alfa 1', 6, ''],
+  ['Candidato B', 'Aiuto allenatore', 'Alfa 2', 1, ''],
+  ['Candidato C', 'Allenatore', 'Bravo', 4, ''],
+  ['Candidato D', 'Allenatore', 'Bravo', 3, ''],
+  ['Candidato E', 'Aiuto allenatore', 'Bravo', 2, ''],
+  ['Candidato F', 'Aiuto allenatore', 'Charlie 1', 5, ''],
+  ['Candidato G', 'Allenatore', 'Delta 1', 4, ''],
+  ['Candidato H', 'Allenatore', 'Echo 2', 3, ''],
+  ['Candidato I', 'Allenatore', 'Foxtrot', 2, ''],
+  ['Candidato L', 'Allenatore', 'Golf', 5, ''],
+  ['Candidato M', 'Allenatore', 'Hotel', 1, ''],
+  ['Candidato N', 'Allenatore', 'India', 3, ''],
+  ['Candidato O', 'Allenatore', AUTOCAND, 0, 'allenatore non tesserato: si candida da se']
+];
+
+function inizializzaDatiProva() {
+  const ui = ui_(), ss = SpreadsheetApp.getActive();
+  if (!ss.getSheetByName(SH.CONFIG)) setup();     // funziona anche su un foglio appena creato
+  const c = cfg_();
+  if (aperta_(c)) return ui.alert('C\'e una votazione aperta: chiudila prima di caricare i dati di prova.');
+  const voti = [1, 2, 3].reduce((n, r) => n + usati_(r, 0).length, 0);
+  if (voti) return ui.alert('Ci sono gia ' + voti + ' voti espressi.\n\nUsa prima "Azzera round…": i dati di prova ' +
+    'sostituiscono societa, squadre e candidati, e con voti in corso il conteggio non avrebbe senso.');
+  if (ui.alert('Dati di prova',
+    'Sostituisco il contenuto dei fogli "Societa", "Squadre" e "Candidati" con dati inventati, negli stessi numeri ' +
+    'dell\'Emilia-Romagna: 11 societa, 16 squadre, 13 candidati di cui 4 aiuto allenatore e uno autocandidato, ' +
+    'e due societa senza candidati.\n\n' +
+    'I dati veri che fossero gia nei fogli vengono persi. Procedere?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+
+  setup();
+  azzeraElezione_(true);          // 3) azzeramento totale, poi riempie con i dati finti
+  sheet_(SH.SQ).getRange(2, 1, PROVA_SQUADRE.length, 2).setValues(PROVA_SQUADRE);
+  sheet_(SH.CAND).getRange(2, 1, PROVA_CANDIDATI.length, 5).setValues(PROVA_CANDIDATI);
+  setCfg_('Titolo', 'Elezione CTL Baskin (PROVA)');
+  setCfg_('Sezione Territoriale', 'Sezione di prova');
+  setCfg_('Formatore di riferimento', 'Candidato C');
+  const nuovi = assegnaCodiciMancanti_(true);
+  messaggiSicuro_();
+  applicaValidazioni_();
+  dopoAzzeramento_();
+
+  const soc = numSocieta_();
+  ui.alert('Dati di prova caricati.\n\n' +
+    soc + ' societa, ' + PROVA_SQUADRE.length + ' squadre, ' + PROVA_CANDIDATI.length +
+    ' candidati (4 aiuto allenatore, 1 autocandidato).\n' +
+    'Commissari da eleggere: ' + posti_(cfg_()) + '. Preferenze per scheda: ' + maxPref_(cfg_(), PROVA_CANDIDATI.length) + '.\n' +
+    nuovi + ' codici generati.\n\n' +
+    'Il titolo e marcato (PROVA): toglilo quando passi ai dati veri.');
+}
+
+/* ================= Scelta dell'interfaccia ================= */
+
+function usaInterfacciaSemplice() { cambiaInterfaccia_('Semplice'); }
+
+function usaInterfacciaHtml() {
+  const ui = ui_(), c = cfg_();
+  const r = ui.prompt('Pagina web di voto',
+    'Indirizzo della pagina su GitHub Pages (per esempio https://uncledan.github.io/votazione-ctl-baskin/).' +
+    (urlHtml_(c) ? '\n\nLascia vuoto per tenere quello attuale:\n' + urlHtml_(c) : ''),
+    ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  const u = String(r.getResponseText() || '').trim().replace(/\/+$/, '');
+  if (u && !/^https:\/\/.+/i.test(u)) return ui.alert('Indirizzo non valido: deve iniziare per https://');
+  if (!u && !urlHtml_(c)) return ui.alert('Senza indirizzo i link ai votanti resterebbero vuoti: riprova indicandolo.');
+  if (u) setCfg_(CFG_URL_HTML, u);
+  cambiaInterfaccia_('HTML');
+}
+
+/**
+ * Cambia l'ingresso attivo e riscrive i link. Si può fare anche a votazione
+ * aperta: le schede già depositate restano valide, perché l'urna e il formato
+ * sono gli stessi. Cambia solo da dove si entra, quindi i link vanno rimandati.
+ */
+function cambiaInterfaccia_(valore) {
+  const ui = ui_(), c = cfg_();
+  if (interfaccia_(c) === (valore === 'HTML' ? 'HTML' : 'SEMPLICE') && valore !== 'HTML')
+    return ui.alert('Si vota già dalla app Google.');
+  if (aperta_(c) && ui.alert('Votazione aperta',
+    'C\'è una votazione aperta. Le schede già depositate restano valide, ma chi ha ricevuto il vecchio link lo troverà chiuso ' +
+    'e dovrai rimandare i link aggiornati.\n\nProcedere?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  setCfg_(CFG_INTERFACCIA, valore);
+  const n = aggiornaLink_();
+  const u = valore === 'HTML' ? urlHtml_(cfg_()) : urlApp_();
+  ui.alert('Interfaccia attiva: ' + valore + '.\n\n' +
+    (u ? 'Indirizzo: ' + u + '\n\n' : 'Indirizzo non ancora disponibile.\n\n') +
+    n + ' link aggiornati nei fogli. Rimanda a ogni votante il SUO link.');
+}
+
+function mostraInterfaccia() {
+  const c = cfg_();
+  const att = interfaccia_(c);
+  ui_().alert('Interfaccia di voto',
+    'Attiva per questa votazione: ' + (att === 'HTML' ? 'pagina web (HTML)' : 'app Google (semplice)') + '.\n\n' +
+    'App Google: ' + (urlApp_() || 'non pubblicata') + '\n' +
+    'Pagina web: ' + (urlHtml_(c) || 'non configurata') + '\n\n' +
+    'Ponte per la pagina web: lo stesso indirizzo della app Google, chiamato in POST.\n' +
+    'Chi prova a votare dall\'ingresso non attivo riceve un rimando a quello giusto.',
+    ui_().ButtonSet.OK);
 }
 
 /* ================= Apertura / chiusura ================= */
@@ -540,7 +869,7 @@ function messaggioParita_(r, tie) {
 
 /**
  * Assegna i posti del round 1:
- * - allenatori e autocandidature entrano per primi, in ordine di preferenze
+ * - allenatori e candidati di altra qualifica entrano per primi, in ordine di preferenze
  *   (spareggio per anni), indipendentemente dal confronto con gli aiuti;
  * - solo se non bastano entrano gli aiuti allenatore, fino al limite della deroga;
  * - gli eventuali posti rimanenti restano vacanti.
@@ -582,7 +911,7 @@ function assegna_(lista, posti, maxAiuti) {
     daB = eleggi(B, Math.min(resto, maxAiuti), 'Deroga aiuto allenatore');
     B.forEach(x => { if (esito[x.nome].esito === 'Non eletto') esito[x.nome].nota = 'Oltre il limite di aiuti allenatore'; });
   } else {
-    B.forEach(x => esito[x.nome].nota = 'Aiuto allenatore: entra solo se mancano allenatori/autocandidature');
+    B.forEach(x => esito[x.nome].nota = 'Aiuto allenatore: entra solo se non bastano gli altri candidati');
   }
   return { esito: esito, vacanti: Math.max(posti - daA - daB, 0), tie: tie };
 }
@@ -723,7 +1052,7 @@ function preparaBallottaggio() {
       posti: tie.posti, n: 1, stato: 'preparato', storico: [] };
   }
 
-  const votanti = r === 1 ? colonna_(sheet_(SH.SOC), 1) : commissari_().map(x => x.nome);
+  const votanti = r === 1 ? nomiSocieta_() : commissari_().map(x => x.nome);
   if (!votanti.length) return ui.alert('Nessun votante per questo round.');
   const usati = codiciEsistenti_();
   const rows = votanti.map(v => { const k = codiceNuovo_(usati); return [v, k, link_(k), '']; });
@@ -1217,8 +1546,8 @@ function aggiornaReport() {
   if (form && nomiCom.indexOf(form) >= 0) statoForm = 'Votante — componente eletto della CTL';
   else if (form && candForm) statoForm = 'Non votante — candidato non eletto al round 1';
   else if (form) statoForm = 'Non votante';
-  if (candForm && !/autocand/i.test(candForm.qualifica))
-    statoForm += ' (attenzione: da regolamento il formatore votante si candida come Autocandidatura)';
+  if (candForm && !candForm.auto)
+    statoForm += ' (attenzione: da regolamento il formatore votante si candida da se: indica "' + AUTOCAND + '" al posto della squadra)';
 
   const ballottaggi = [1, 2, 3].map(r => {
     const st = balState_(r);
@@ -1281,7 +1610,7 @@ function aggiornaUrna() {
   push(R('Aggiornato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm')));
   push(R('Stato', descrContesto_(c) + ': ' + (aperta_(c) ? 'APERTA' : 'CHIUSA')));
 
-  function sezione(titolo, votanti, used, schede, nomi, inCorso) {
+  function sezione(titolo, votanti, used, schede, nomi, inCorso, ric) {
     push(R(''));
     push(R(titolo + (inCorso ? ' (IN CORSO)' : '')), 'h');
     if (!votanti.length && !schede.length) { push(R('Non ancora preparato.')); return; }
@@ -1305,6 +1634,11 @@ function aggiornaUrna() {
       .forEach(n => push(R(n, voti[n], nomi.indexOf(n) < 0 ? 'Non presente tra i candidati' : '')));
     push(R('Scheda n. (ordine casuale)', 'Preferenze'), 'b');
     schede.forEach((s, i) => push(R(i + 1, s.length ? s.join(', ') : '(bianca)')));
+    if (ric && ric.length) {
+      push(R('Ricevute di voto (ordine alfabetico)', ric.join('  ·  '),
+        'Ogni votante trova qui la propria: vuol dire che la sua scheda e nell\'urna ed e stata contata. ' +
+        'La ricevuta non dice come ha votato e non corrisponde al numero di scheda qui sopra.'));
+    }
   }
 
   const rAtt = roundAttivo_(c), bAtt = ballottaggioAttivo_(c);
@@ -1313,19 +1647,20 @@ function aggiornaUrna() {
       ? (function () { const m = codiciMap_(); return Object.keys(m).map(k => ({ nome: m[k], codice: k })); })()
       : commissari_().filter(x => norm_(x.codice)).map(x => ({ nome: x.nome, codice: norm_(x.codice) }));
     sezione('Round ' + r + ' – ' + ROUND[r].nome, votanti, new Set(usati_(r, 0)), schede_(r, 0),
-      candidatiRound_(r, c).map(x => x.nome), aperta_(c) && rAtt === r && !bAtt);
+      candidatiRound_(r, c).map(x => x.nome), aperta_(c) && rAtt === r && !bAtt, ricevute_(r, 0));
 
     const st = balState_(r);
     if (!st) return;
     st.storico.forEach(b => sezione('Round ' + r + ' · Ballottaggio ' + b.n + ' (' + b.posti + (b.posti === 1 ? ' posto' : ' posti') + ')',
-      [], new Set(usati_(r, b.n)), schede_(r, b.n), b.candidati, false));
+      [], new Set(usati_(r, b.n)), schede_(r, b.n), b.candidati, false, ricevute_(r, b.n)));
     if (st.stato === 'preparato') {
       const bal = ss.getSheetByName(SH.BAL);
       const vot = bal && bal.getLastRow() > 1
         ? bal.getRange(2, 1, bal.getLastRow() - 1, 2).getValues().filter(x => norm_(x[1])).map(x => ({ nome: String(x[0]), codice: norm_(x[1]) }))
         : [];
       sezione('Round ' + r + ' · Ballottaggio ' + st.n + ' (' + st.posti + (st.posti === 1 ? ' posto' : ' posti') + ')',
-        vot, new Set(usati_(r, st.n)), schede_(r, st.n), st.candidati, aperta_(c) && rAtt === r && bAtt === st.n);
+        vot, new Set(usati_(r, st.n)), schede_(r, st.n), st.candidati, aperta_(c) && rAtt === r && bAtt === st.n,
+        ricevute_(r, st.n));
     }
   });
 
@@ -1350,29 +1685,10 @@ function azzeraRound() {
   const t = p.getResponseText().trim().toUpperCase();
   const rounds = t === 'TUTTI' ? [1, 2, 3] : ([1, 2, 3].indexOf(parseInt(t, 10)) >= 0 ? [parseInt(t, 10)] : []);
   if (!rounds.length) return ui.alert('Valore non valido.');
-  const props = PropertiesService.getScriptProperties();
   const c = cfg_();
   const ss = SpreadsheetApp.getActive();
-  rounds.forEach(r => {
-    props.deleteProperty(ROUND[r].ballots);
-    props.deleteProperty(ROUND[r].used);
-    for (let b = 1; b <= MAX_BALLOTTAGGI; b++) { props.deleteProperty(chiave_(r, b, 'BALLOTS')); props.deleteProperty(chiave_(r, b, 'USED')); }
-    if (balState_(r) && ss.getSheetByName(SH.BAL)) ss.getSheetByName(SH.BAL).clearContents();
-    props.deleteProperty('BALSTATE_' + r);
-    if (roundAttivo_(c) === r) { setCfg_('Stato', 'CHIUSA'); setCfg_('Ballottaggio', 0); }
-    if (r === 1) {
-      const soc = sheet_(SH.SOC);
-      if (soc.getLastRow() > 1) soc.getRange(2, 4, soc.getLastRow() - 1, 1).clearContent();
-      const ris = sheet_(SH.RIS);
-      if (ris.getLastRow() > 1) ris.getRange(2, 1, ris.getLastRow() - 1, ris.getLastColumn()).clearContent();
-    } else {
-      setCfg_(ROUND[r].cfg, '');
-      const com = sheet_(SH.COM);
-      if (com.getLastRow() > 1) com.getRange(2, COM_HEADER.indexOf(ROUND[r].col) + 1, com.getLastRow() - 1, 1).clearContent();
-      const ris = ss.getSheetByName(ROUND[r].ris);
-      if (ris) ris.clearContents();
-    }
-  });
+  const props = PropertiesService.getScriptProperties();
+  rounds.forEach(r => azzeraUnRound_(r, c));
   if (t === 'TUTTI') {
     props.setProperty(P_SALT, Utilities.getUuid());
     setCfg_('Stato', 'CHIUSA');
@@ -1385,9 +1701,145 @@ function azzeraRound() {
   ui.alert('Azzerato: round ' + rounds.join(', ') + ' (con i relativi ballottaggi). I codici di società e commissari restano validi.');
 }
 
+/** Cancella schede, codici usati, ballottaggi e risultati di un solo round. */
+function azzeraUnRound_(r, c) {
+  const props = PropertiesService.getScriptProperties();
+  const ss = SpreadsheetApp.getActive();
+  props.deleteProperty(ROUND[r].ballots);
+  props.deleteProperty(ROUND[r].used);
+  props.deleteProperty(ROUND[r].ric);
+  for (let b = 1; b <= MAX_BALLOTTAGGI; b++) {
+    props.deleteProperty(chiave_(r, b, 'BALLOTS'));
+    props.deleteProperty(chiave_(r, b, 'USED'));
+    props.deleteProperty(chiave_(r, b, 'RIC'));
+  }
+  if (balState_(r) && ss.getSheetByName(SH.BAL)) ss.getSheetByName(SH.BAL).clearContents();
+  props.deleteProperty('BALSTATE_' + r);
+  if (roundAttivo_(c) === r) { setCfg_('Stato', 'CHIUSA'); setCfg_('Ballottaggio', 0); }
+  if (r === 1) {
+    const soc = sheet_(SH.SOC);
+    if (soc.getLastRow() > 1) soc.getRange(2, 4, soc.getLastRow() - 1, 1).clearContent();
+    const ris = sheet_(SH.RIS);
+    if (ris.getLastRow() > 1) ris.getRange(2, 1, ris.getLastRow() - 1, ris.getLastColumn()).clearContent();
+  } else {
+    setCfg_(ROUND[r].cfg, '');
+    const com = sheet_(SH.COM);
+    if (com.getLastRow() > 1) com.getRange(2, COM_HEADER.indexOf(ROUND[r].col) + 1, com.getLastRow() - 1, 1).clearContent();
+    const ris = ss.getSheetByName(ROUND[r].ris);
+    if (ris) ris.clearContents();
+  }
+}
+
+/* ================= Azzeramento totale: riuso per l'elezione successiva ================= */
+
+/**
+ * Riporta il foglio allo stato "pronto per una nuova elezione", in qualunque
+ * momento e anche a votazione aperta: ferma tutto, cancella schede, codici usati,
+ * ballottaggi, commissari e risultati, annulla le aperture e chiusure programmate
+ * e rigenera i codici, cosi i link vecchi non funzionano piu.
+ *
+ * Non tocca il deployment della app web: l'indirizzo resta quello, non serve
+ * ripubblicare niente. Restano anche i parametri di Config (sezione, logo,
+ * interfaccia, deroghe) e, se si vuole, societa, squadre e candidati.
+ */
+/**
+ * Motore dei tre azzeramenti. Ferma qualunque votazione in corso, annulla le
+ * aperture e chiusure programmate e cancella tutto cio che riguarda la tornata:
+ * schede e codici usati dei tre round e dei ballottaggi, commissari, Presidente,
+ * Vice, risultati, report e riepilogo urna.
+ *
+ * svuotaAnagrafiche = true azzera anche societa, squadre e candidati.
+ * Non tocca mai il deployment della app web ne i parametri di Config.
+ */
+function azzeraElezione_(svuotaAnagrafiche) {
+  const ss = SpreadsheetApp.getActive();
+  eliminaTrigger_(null);
+  ['Apertura voto commissari', 'Chiusura voto commissari', 'Apertura voto presidente', 'Chiusura voto presidente']
+    .forEach(k => setCfg_(k, ''));
+  setCfg_('Stato', 'CHIUSA');
+
+  const c = cfg_();
+  [1, 2, 3].forEach(r => azzeraUnRound_(r, c));
+  setCfg_('Stato', 'CHIUSA');
+  setCfg_('Round attivo', 1);
+  setCfg_('Ballottaggio', 0);
+  setCfg_('Presidente', '');
+  setCfg_('Vice', '');
+
+  svuotaFoglio_(ss, SH.COM, COM_HEADER);
+  svuotaFoglio_(ss, SH.BAL, BAL_HEADER);
+  svuotaFoglio_(ss, SH.RIS, RIS_HEADER);
+  svuotaFoglio_(ss, SH.MSG, MSG_HEADER);
+  [SH.RP, SH.RV, SH.RB].forEach(n => { const sh = ss.getSheetByName(n); if (sh) sh.clearContents(); });
+
+  if (svuotaAnagrafiche) {
+    PropertiesService.getScriptProperties().setProperty(P_SALT, Utilities.getUuid());
+    svuotaFoglio_(ss, SH.SOC, SOC_HEADER);
+    svuotaFoglio_(ss, SH.SQ, SQ_HEADER);
+    svuotaFoglio_(ss, SH.CAND, CAND_HEADER);
+    setCfg_('Formatore di riferimento', '');
+  }
+  applicaValidazioni_();
+}
+
+/** Chiude il lavoro dei tre azzeramenti: rigenera i resoconti vuoti. */
+function dopoAzzeramento_() {
+  aggiornaReport();
+  aggiornaUrna();
+  messaggiSicuro_();
+}
+
+/** Rigenera i messaggi senza far fallire l'operazione in corso se qualcosa manca. */
+function messaggiSicuro_() {
+  try { return preparaMessaggi(); } catch (e) { return 0; }
+}
+
+/**
+ * 1) Solo i risultati. Societa, squadre, candidati E CODICI restano come sono:
+ * si rivota subito con i link gia inviati. Per una prova andata storta, una
+ * votazione annullata o un secondo giro con gli stessi iscritti.
+ */
+function azzeraRisultati() {
+  const ui = ui_();
+  if (ui.alert('Azzera solo i risultati',
+    'Interrompe qualunque votazione in corso e cancella schede, codici usati, ballottaggi, commissari eletti, ' +
+    'Presidente, Vice, risultati, report e riepilogo urna.\n\n' +
+    'RESTANO societa, squadre, candidati e i codici di voto: i link gia inviati continuano a funzionare e si ' +
+    'puo rivotare subito con gli stessi.\n\n' +
+    'Le schede cancellate non si recuperano. Procedere?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  azzeraElezione_(false);
+  dopoAzzeramento_();
+  ui.alert('Risultati azzerati.\n\n' + numSocieta_() + ' societa, ' + squadre_().length + ' squadre e ' +
+    candidati_().length + ' candidati restano al loro posto, con i codici di prima.\n\n' +
+    'Apri il round 1 quando vuoi: i votanti usano il link che hanno gia.\n' +
+    'Se invece vuoi codici nuovi, lancia dopo "Rigenera TUTTI i codici e link societa".');
+}
+
+/**
+ * 2) Azzeramento totale: via anche societa, squadre e candidati, per una nuova
+ * elezione, un'altra Sezione Territoriale o un'altra stagione.
+ */
+function azzeraTutto() {
+  const ui = ui_();
+  if (ui.alert('Azzera tutto',
+    'Interrompe qualunque votazione in corso e cancella TUTTO: schede, codici usati, ballottaggi, commissari, ' +
+    'Presidente, Vice, risultati, report, riepilogo urna, aperture e chiusure programmate, e anche ' +
+    'SOCIETA, SQUADRE, CANDIDATI e i loro codici.\n\n' +
+    'Restano solo i parametri di Config (sezione, anno, logo, interfaccia, deroghe).\n' +
+    'NON tocca la pubblicazione della app web: stesso indirizzo, nessuna ripubblicazione.\n\n' +
+    'Niente di tutto questo si recupera. Procedere?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  azzeraElezione_(true);
+  dopoAzzeramento_();
+  ui.alert('Azzerato tutto.\n\nI fogli "Societa", "Squadre" e "Candidati" sono vuoti: compilali e poi ' +
+    '"Round 1 → Genera codici e link mancanti".\n\n' +
+    'La app web non e stata toccata: stesso indirizzo, nessuna ripubblicazione.');
+}
+
 /* ================= App web (votanti) ================= */
 
 function doGet(e) {
+  const c0 = cfg_();
+  if (interfaccia_(c0) === 'HTML') return cartello_(c0, (e && e.parameter && e.parameter.c) || '');
   const t = HtmlService.createTemplateFromFile('Index');
   t.codice = (e && e.parameter && e.parameter.c) || '';
   t.repo = REPO_URL;
@@ -1397,6 +1849,66 @@ function doGet(e) {
   return t.evaluate()
     .setTitle(cfg_()['Titolo'] || 'Votazione')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * Pagina mostrata dalla app Google quando per questa votazione è attiva
+ * l'interfaccia HTML: non un errore, ma un cartello con il link giusto,
+ * perché i vecchi link continuano a circolare nelle chat.
+ */
+function cartello_(c, codice) {
+  const u = urlHtml_(c);
+  const dest = u ? u + (norm_(codice) ? '#c=' + norm_(codice) : '') : '';
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  const html =
+    '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1"><style>' +
+    'body{margin:0;background:#ecebe5;color:#1d2433;font:17px/1.55 Georgia,"Times New Roman",serif}' +
+    'main{max-width:520px;margin:0 auto;padding:40px 16px}' +
+    '.k{background:#fbfaf6;border:1px solid #d9d4c7;border-radius:6px;padding:26px 20px;box-shadow:0 2px 0 #d9d4c7}' +
+    'h1{font-size:1.3rem;margin:0 0 12px}p{margin:0 0 14px}' +
+    'a.b{display:block;text-align:center;background:#1f4e8c;color:#fff;text-decoration:none;' +
+    'font:600 17px system-ui,sans-serif;padding:14px;border-radius:6px;margin-top:18px}' +
+    '.n{color:#5b6475;font:13px/1.5 system-ui,sans-serif;margin-top:18px}' +
+    '</style></head><body><main><div class="k">' +
+    '<h1>Si vota da un\'altra pagina</h1>' +
+    '<p>Per questa votazione le schede si compilano sulla pagina web della Sezione Territoriale, ' +
+    'non su questa app.</p>' +
+    (dest
+      ? '<a class="b" href="' + esc(dest) + '" target="_top">Vai alla pagina di voto</a>' +
+        '<p class="n">Se il pulsante non funziona, copia questo indirizzo: ' + esc(dest) + '</p>'
+      : '<p class="n">L\'indirizzo della pagina non è ancora stato configurato: chiedilo al Coordinatore della Sezione Tecnica.</p>') +
+    '<p class="n">Il tuo codice resta lo stesso: vale su entrambe le pagine, ma si può usare una volta sola.</p>' +
+    '</div></main></body></html>';
+  return HtmlService.createHtmlOutput(html)
+    .setTitle(String(c['Titolo'] || 'Votazione'))
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/* ================= Ponte per l'interfaccia statica (GitHub Pages) ================= */
+
+/**
+ * Secondo ingresso, usato solo quando in Config l'interfaccia attiva è HTML.
+ * Riceve una richiesta "semplice" (text/plain, nessuna intestazione aggiunta) per
+ * non far scattare il preflight CORS, che Apps Script non sa gestire, e risponde JSON.
+ * Usa le stesse funzioni della app Google, quindi stessa urna, stessi controlli,
+ * stesso formato della scheda: le due porte non possono divergere.
+ */
+function doPost(e) {
+  let out;
+  try {
+    const req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    switch (String(req.azione || '')) {
+      case 'info': out = getInfo('html'); break;
+      case 'verifica': out = verificaCodice(req.codice, 'html'); break;
+      case 'voto': out = inviaVoto(req.codice, req.scelte, req.ctx, 'html'); break;
+      default: out = { ok: false, err: 'Azione non riconosciuta.' };
+    }
+  } catch (err) {
+    out = { ok: false, err: 'Richiesta non valida: ' + ((err && err.message) || err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(out))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 /** Contesto di voto attivo: round, ballottaggio, candidati e massimo di preferenze. */
@@ -1412,9 +1924,10 @@ function contesto_(c) {
   return { r: r, b: b, cand: cand, max: max, st: st, id: r + '-' + b };
 }
 
-function getInfo() {
+function getInfo(origine) {
   const c = cfg_();
   const x = contesto_(c);
+  const avviso = guardiaIngresso_(c, origine);
   const titolo = String(c['Titolo'] || 'Votazione');
   let messaggio;
   if (x.b) {
@@ -1431,13 +1944,25 @@ function getInfo() {
     sottotitolo: x.r === 1 ? 'Voto anonimo — una scheda per società' : 'Voto anonimo — una scheda per commissario',
     messaggio: messaggio,
     prefisso: ROUND[x.r].prefisso,
-    aperta: aperta_(c) && !x.errore,
+    aperta: aperta_(c) && !x.errore && !avviso,
+    avviso: avviso || '',
     candidati: x.cand.map(k => ({
       nome: k.nome,
       qualifica: x.r === 1 ? k.qualifica : '',
-      squadra: k.squadra + (soc[k.squadra] && soc[k.squadra] !== k.squadra ? ' (' + soc[k.squadra] + ')' : '')
+      auto: !!k.auto,
+      squadra: k.squadra + (soc[k.squadra] && soc[k.squadra] !== k.squadra ? ' (' + soc[k.squadra] + ')' : ''),
+      // campi separati: la pagina statica raggruppa i candidati per società
+      squadraNome: k.squadra,
+      societa: soc[k.squadra] || ''
     })),
     max: x.max,
+    // identita della votazione: ogni Sezione Territoriale ha la sua CTL
+    sezione: sezione_(c),
+    anno: anno_(c),
+    logo: String(c['Logo pagina web'] || '').trim(),
+    proprietaLogo: PROPRIETA_LOGO,
+    repo: REPO_URL,
+    versione: VERSIONE,
     programma: testoProgramma_(c),
     eletti: x.r === 1 && !x.b ? posti_(c) : 0,
     maxAiuti: x.r === 1 && !x.b ? maxAiuti_(c) : 0
@@ -1458,22 +1983,25 @@ function testoProgramma_(c) {
   return '';
 }
 
-function verificaCodice(codice) {
+function verificaCodice(codice, origine) {
   const c = cfg_();
-  if (!aperta_(c)) return { ok: false, err: 'La votazione non è aperta.' };
+  const avviso = guardiaIngresso_(c, origine);
+  if (avviso) return { ok: false, err: avviso, motivo: 'interfaccia' };
+  if (!aperta_(c)) return { ok: false, err: 'La votazione non è aperta.', motivo: 'chiusa' };
   const x = contesto_(c);
-  if (x.errore) return { ok: false, err: 'Votazione non disponibile.' };
+  if (x.errore) return { ok: false, err: 'Votazione non disponibile.', motivo: 'chiusa' };
   const chi = votantiMap_(x.r, x.b)[norm_(codice)];
-  if (!chi) return { ok: false, err: x.b ? 'Codice non valido per il ballottaggio: serve il nuovo link ricevuto per il ballottaggio.' : 'Codice non valido per la votazione in corso.' };
-  if (usati_(x.r, x.b).indexOf(hash_(codice)) >= 0) return { ok: false, err: 'Con questo codice è già stato espresso il voto.' };
+  // motivo "codice": e il solo caso che conta per il blocco dopo tre tentativi
+  if (!chi) return { ok: false, motivo: 'codice', err: x.b ? 'Codice non valido per il ballottaggio: serve il nuovo link ricevuto per il ballottaggio.' : 'Codice non valido per la votazione in corso.' };
+  if (usati_(x.r, x.b).indexOf(hash_(codice)) >= 0) return { ok: false, err: 'Con questo codice è già stato espresso il voto.', motivo: 'usato' };
   return { ok: true, votante: chi, ctx: x.id };
 }
 
-function inviaVoto(codice, scelte, ctx) {
+function inviaVoto(codice, scelte, ctx, origine) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    const v = verificaCodice(codice);
+    const v = verificaCodice(codice, origine);
     if (!v.ok) return v;
     if (ctx && String(ctx) !== v.ctx) return { ok: false, err: 'Nel frattempo la votazione è cambiata: ricarica la pagina.' };
     const c = cfg_();
@@ -1490,10 +2018,17 @@ function inviaVoto(codice, scelte, ctx) {
     const used = usati_(x.r, x.b);
     used.push(hash_(codice));
     used.sort();
+    // la ricevuta va in un elenco suo, mescolato a parte: cosi non si puo
+    // risalire dalla ricevuta alla scheda confrontando le posizioni
+    const ric = ricevute_(x.r, x.b);
+    const mia = ricevutaNuova_(ric);
+    ric.push(mia);
+    ric.sort();
     PropertiesService.getScriptProperties().setProperties({
-      [chiave_(x.r, x.b, 'BALLOTS')]: JSON.stringify(schede), [chiave_(x.r, x.b, 'USED')]: JSON.stringify(used)
+      [chiave_(x.r, x.b, 'BALLOTS')]: JSON.stringify(schede), [chiave_(x.r, x.b, 'USED')]: JSON.stringify(used),
+      [chiave_(x.r, x.b, 'RIC')]: JSON.stringify(ric)
     });
-    return { ok: true, votante: v.votante };
+    return { ok: true, votante: v.votante, ricevuta: mia };
   } finally {
     lock.releaseLock();
   }
@@ -1610,6 +2145,7 @@ function candidati_() {
       qualifica: q,
       aiuto: /aiuto/i.test(q),
       squadra: String(col(r, h.squadra)).trim(),
+      auto: /autocand/i.test(String(col(r, h.squadra))),
       anni: Number(col(r, h.anni)) || 0
     };
   });
@@ -1624,9 +2160,35 @@ function squadre_() {
 }
 
 function mappaSquadraSocieta_() {
-  const m = {};
-  squadre_().forEach(x => m[x.squadra] = x.societa);
+  const brevi = nomiBrevi_(), m = {};
+  squadre_().forEach(x => m[x.squadra] = brevi[x.societa] || x.societa);
   return m;
+}
+
+/**
+ * Ragione sociale -> nome breve. Nel foglio "Societa" la prima colonna porta la
+ * ragione sociale esatta, che serve per gli atti ma e illeggibile in un messaggio
+ * o in un elenco; il nome breve e quello con cui la societa si chiama davvero, ed
+ * e quello che compare ai votanti, nei messaggi e nei resoconti.
+ */
+function nomiBrevi_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(SH.SOC);
+  const m = {};
+  if (!sh || sh.getLastRow() < 2) return m;
+  const n = sh.getLastRow() - 1;
+  const rag = sh.getRange(2, 1, n, 1).getValues();
+  const br = sh.getLastColumn() >= 5 ? sh.getRange(2, 5, n, 1).getValues() : rag.map(() => ['']);
+  rag.forEach((r, i) => {
+    const k = String(r[0]).trim();
+    if (k) m[k] = String(br[i][0]).trim() || k;
+  });
+  return m;
+}
+
+/** Nomi brevi delle societa, nell'ordine del foglio. */
+function nomiSocieta_() {
+  const brevi = nomiBrevi_();
+  return colonna_(sheet_(SH.SOC), 1).map(x => brevi[x] || x);
 }
 
 function maxPref_(c, n) {
@@ -1690,8 +2252,9 @@ function codiciMap_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(SH.SOC);
   const m = {};
   if (!sh || sh.getLastRow() < 2) return m;
+  const brevi = nomiBrevi_();
   sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues()
-    .forEach(r => { const k = norm_(r[1]); if (k && String(r[0]).trim()) m[k] = String(r[0]).trim(); });
+    .forEach(r => { const k = norm_(r[1]); const rag = String(r[0]).trim(); if (k && rag) m[k] = brevi[rag] || rag; });
   return m;
 }
 
@@ -1710,8 +2273,27 @@ function votantiMap_(r, b) {
 }
 
 function chiave_(r, b, tipo) {
-  if (!b) return tipo === 'BALLOTS' ? ROUND[r].ballots : ROUND[r].used;
+  if (!b) return tipo === 'BALLOTS' ? ROUND[r].ballots : (tipo === 'RIC' ? ROUND[r].ric : ROUND[r].used);
   return 'BAL_' + r + '_' + b + '_' + tipo;
+}
+
+/** Ricevute del round (o ballottaggio): una per scheda, in ordine casuale. */
+function ricevute_(r, b) { return JSON.parse(PropertiesService.getScriptProperties().getProperty(chiave_(r, b || 0, 'RIC')) || '[]'); }
+
+/**
+ * Ricevuta di voto: un codice casuale, generato al momento del deposito e
+ * scollegato sia dal codice del votante sia dal contenuto della scheda. Serve
+ * solo a far ritrovare al votante la propria riga nel riepilogo dell'urna, per
+ * sapere che la sua scheda e stata contata. Non dice COME ha votato: e proprio
+ * quello che rende possibile tenerla anonima.
+ */
+function ricevutaNuova_(gia) {
+  for (let i = 0; i < 500; i++) {
+    const n = Utilities.getUuid().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const k = n.slice(0, 4) + '-' + n.slice(4, 8);
+    if (gia.indexOf(k) < 0) return k;
+  }
+  return 'R' + new Date().getTime();
 }
 function schede_(r, b) { return JSON.parse(PropertiesService.getScriptProperties().getProperty(chiave_(r, b || 0, 'BALLOTS')) || '[]'); }
 function usati_(r, b) { return JSON.parse(PropertiesService.getScriptProperties().getProperty(chiave_(r, b || 0, 'USED')) || '[]'); }

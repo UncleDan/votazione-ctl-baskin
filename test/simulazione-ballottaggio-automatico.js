@@ -27,6 +27,7 @@ function daTrigger(fn) {
 
 // ---------------- Preparazione: parità garantita ----------------
 setup();
+setCfg_('Interfaccia di voto', 'Semplice');   // questa simulazione prova la porta "app Google"
 setCfg_('Sezione Territoriale', 'Emilia-Romagna');
 setCfg_('Anno sportivo', '2026/2027');
 foglio('Squadre').getRange(2, 1, 5, 2).setValues(

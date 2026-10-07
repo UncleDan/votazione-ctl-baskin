@@ -23,6 +23,7 @@ Sheet.prototype = {
       clearContent() { for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) { const row = sh.d[r - 1 + i]; if (row && row.length >= c + j) row[c - 1 + j] = ''; } return R; },
       setRichTextValue(v) { sh.cell(r, c)[c - 1] = v.text; return R; },
       setFontWeight() { return R; }, setBackground() { return R; }, setFontSize() { return R; },
+      setWrap() { return R; }, setVerticalAlignment() { return R; }, setHorizontalAlignment() { return R; },
       setDataValidation() { return R; }, setNumberFormat() { return R; },
       setFormula(f) { sh.cell(r, c)[c - 1] = f; return R; }
     };
@@ -31,7 +32,8 @@ Sheet.prototype = {
   appendRow(a) { this.d.splice(this.getLastRow(), 0, a.slice()); },
   clearContents() { this.d = []; }, clear() { this.d = []; },
   insertColumnsAfter(c, n) { this.d.forEach(r => { while (r.length < c) r.push(''); r.splice(c, 0, ...Array(n).fill('')); }); },
-  setFrozenRows() {}, autoResizeColumns() {}, activate() {}, setRowHeight() {}, setRowHeights() {}
+  setFrozenRows() {}, autoResizeColumns() {}, activate() {}, setRowHeight() {}, setRowHeights() {},
+  setColumnWidth() {}, setColumnWidths() {}, hideColumns() {}
 };
 
 const SS = {
@@ -83,7 +85,23 @@ global.ScriptApp = {
     return b;
   }
 };
-global.HtmlService = {};
+global.HtmlService = {
+  createHtmlOutput(h) {
+    const o = { html: h, getContent: () => h, setTitle: () => o, addMetaTag: () => o };
+    return o;
+  },
+  createTemplateFromFile(n) {
+    const t = { file: n, evaluate() { const o = { template: t, setTitle: () => o, addMetaTag: () => o }; return o; } };
+    return t;
+  }
+};
+global.ContentService = {
+  MimeType: { JSON: 'application/json', TEXT: 'text/plain' },
+  createTextOutput(s) {
+    const o = { text: s, getContent: () => s, setMimeType: () => o };
+    return o;
+  }
+};
 
 // --- email di avviso ---
 const email = [];
