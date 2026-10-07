@@ -1,4 +1,4 @@
-# Votazione CTL Baskin — istruzioni (v9)
+# Votazione CTL Baskin — istruzioni (v17)
 
 Voto online anonimo, utilizzabile da telefono senza account Google:
 
@@ -12,6 +12,90 @@ Voto online anonimo, utilizzabile da telefono senza account Google:
 Il **Formatore di riferimento** non si vota: si indica in *Config*.
 
 Codice sorgente aperto: <https://github.com/UncleDan/votazione-ctl-baskin> (licenza MIT). Per trasparenza il link diretto e cliccabile, con il numero di versione, compare in fondo alla pagina di voto e in tutti i fogli di resoconto.
+
+## Da dove si vota: app Google o pagina web
+
+Il sistema ha due ingressi, e per ogni votazione **ne vale uno solo**.
+
+- **Semplice**: si vota dalla app Google, come sempre. Non serve altro.
+- **HTML** (predefinito su un foglio nuovo): si vota da una pagina pubblicata su GitHub Pages, che parla con questo stesso foglio. Più curata da telefono, ma dipende da una pubblicazione in più.
+
+Si sceglie da **🗳️ Votazione → Interfaccia di voto**. Cambiando ingresso, tutti i link di società, commissari ed eventuali ballottaggi vengono riscritti: **rimandali ai votanti**, perché i vecchi smettono di funzionare. Chi apre un vecchio link trova un cartello che lo porta alla pagina giusta, con il suo codice già inserito, quindi nessuno resta a piedi.
+
+Il controllo non è solo un'indicazione a schermo: una scheda che arriva dall'ingresso chiuso viene rifiutata dal lato che scrive. Si può cambiare interfaccia anche a votazione aperta — le schede già depositate restano valide, perché l'urna e il formato sono gli stessi — ma conviene deciderlo prima di mandare i link.
+
+### Per attivare l'interfaccia HTML
+
+1. Nel repository GitHub: **Settings → Pages → Source: GitHub Actions**.
+2. **Settings → Secrets and variables → Actions → Variables → New variable**: nome `PONTE`, valore l'indirizzo `/exec` della tua web app Apps Script (lo stesso che usi per votare dalla app).
+3. Fai un push (o lancia il workflow a mano): la Action pubblica solo la cartella `scheda-html/` e ci inserisce l'indirizzo del ponte.
+4. Nel foglio: **Interfaccia di voto → Usa la pagina web (HTML)…** e incolla l'indirizzo della pagina pubblicata.
+5. Provala tu con un codice vero prima di mandare i link. Se qualcosa non va, torna a **Usa la app Google (semplice)**: nessuno se ne accorge.
+
+Il ponte è lo stesso script: le due pagine usano le stesse funzioni, quindi la stessa urna, gli stessi controlli e lo stesso formato della scheda. Con l'interfaccia HTML il codice viaggia dopo il cancelletto (`#c=…`): i browser non inviano quella parte al server, quindi il codice non finisce nei log.
+
+
+## Qualifiche e autocandidature
+
+La colonna **Qualifica** dice che cosa è il candidato: `Allenatore`, `Aiuto allenatore` oppure `Altro`, quest'ultimo per i rari casi di persone candidabili che non rientrano nelle prime due.
+
+L'**autocandidatura** non è una qualifica: è il modo in cui si arriva in lista. Chi si candida da sè senza essere tesserato con un club si indica scrivendo `Autocandidatura` nella colonna **Squadra**, che la accetta dal menu a tendina insieme alle squadre iscritte. Così un allenatore attualmente non tesserato che *non* si candida semplicemente non compare, mentre chi si candida ha la sua riga senza doversi inventare una squadra.
+
+La deroga sugli aiuto allenatore si legge di conseguenza: entrano solo se **non bastano gli altri candidati** — allenatori e `Altro`, autocandidati compresi — e comunque al massimo quanti ne indica *Config → Max aiuti allenatore*.
+
+Se arrivi da una versione precedente, dove `Autocandidatura` era una qualifica, l'inizializzazione converte le righe da sola: la qualifica diventa `Altro` e, se la squadra era vuota, ci mette `Autocandidatura`. Chi aveva sia la qualifica sia una squadra tiene la squadra: controlla quelle righe.
+
+## Provare senza dati veri
+
+**🗳️ Votazione → Riempi con dati di prova…** sostituisce società, squadre e candidati con dati inventati, ma negli stessi numeri dell'Emilia-Romagna 2026/2027: 11 società, 16 squadre, 13 candidati di cui 4 aiuto allenatore e uno autocandidato, due società senza candidati, 6 commissari da eleggere e 7 preferenze per scheda. I nomi vengono dall'alfabeto fonetico (Baskin Alfa, Candidato A…): nessuna persona e nessun club reale.
+
+Il titolo viene marcato **(PROVA)**, così non si confonde con una votazione vera: toglilo quando passi ai dati definitivi. La voce si rifiuta di partire se c'è una votazione aperta o se ci sono già voti espressi.
+
+
+## Ricominciare da capo
+
+Nel sottomenu **🗳️ Votazione → Azzeramenti** ci sono quattro voci. Tutte interrompono qualunque votazione in corso, e **nessuna tocca la pubblicazione della app web**: l'indirizzo resta lo stesso e non devi ripubblicare niente, né fra un'elezione e l'altra né fra una prova e l'altra.
+
+**Solo i risultati, stessi codici.** Cancella schede, codici usati, ballottaggi, commissari eletti, Presidente, Vice, risultati, report e riepilogo urna. Restano società, squadre, candidati **e i codici**: si rivota subito e i link già inviati continuano a funzionare. È la voce giusta per una prova andata storta, per una votazione annullata o per rifare il giro con gli stessi iscritti.
+
+**Un round solo.** Azzera un round per volta, con i suoi ballottaggi, lasciando in piedi tutto il resto.
+
+**Tutto, per una nuova elezione.** Come la prima, più società, squadre, candidati e i loro codici. Restano solo i parametri di *Config* — sezione, anno, logo, interfaccia di voto, deroghe — che di solito non cambiano. Da usare per un'altra Sezione Territoriale o un'altra stagione.
+
+**Tutto e riempi con dati di prova.** L'azzeramento totale seguito dal seed fittizio descritto sopra.
+
+Se ti serve la via di mezzo — stessi iscritti ma codici nuovi, per esempio perché i vecchi link hanno girato troppo — usa *Solo i risultati* e subito dopo *Round 1 → Rigenera TUTTI i codici e link società*.
+
+## La ricevuta di voto
+
+Chi deposita la scheda riceve un codice tipo `7K2M-94QD`, mostrato in grande con l'invito a fare uno screenshot o a trascriverlo. **Non è recuperabile**: non è scritto da nessuna parte accanto al nome del votante, quindi chiusa la pagina non lo conosce più nessuno, nemmeno tu.
+
+A spoglio concluso le ricevute compaiono nel foglio **Riepilogo urna**, in fondo a ogni round, in ordine alfabetico. Chi ritrova la propria sa che la sua scheda è nell'urna ed è stata contata.
+
+Quello che la ricevuta **non** fa è dire come si è votato: è generata a caso al momento del deposito, non deriva né dal codice del votante né dalle preferenze, e sta in un elenco separato da quello delle schede, mescolato per conto suo. Nemmeno confrontando le posizioni nei due elenchi si può legare una ricevuta a una scheda. È la condizione perché resti un voto anonimo e insieme verificabile.
+
+Vale la pena spiegarlo nella comunicazione che accompagna i link: una ricevuta che nessuno sa a cosa serve viene buttata via.
+
+
+## I messaggi per i votanti
+
+Il foglio **Messaggi** ha una riga per ogni votante del round attivo e, nella terza colonna, il testo già pronto: copi la cella e la incolli nella chat della società, senza ricomporlo ogni volta. Dentro c'è il link personale, il codice, quante preferenze si possono dare, l'eventuale data di chiusura e la spiegazione della ricevuta.
+
+Si rigenera da **🗳️ Votazione → Prepara i messaggi per i votanti**, e da solo ogni volta che i codici cambiano o che azzeri qualcosa. Per il round 2 lancialo dopo *Prepara commissari e link*: i destinatari diventano i commissari eletti.
+
+## Tre codici sbagliati
+
+Dopo tre tentativi con un codice inesistente, il voto da quel dispositivo resta sospeso per un'ora, con il tempo che manca scritto a schermo. Il conteggio sta in una memoria tecnica del browser: non contiene niente di personale, non raggiunge nessun server e non traccia nessuno, quindi non serve alcun avviso sui cookie.
+
+Due precisazioni oneste. Chi ha un codice valido ma ha **già votato** non fa scattare il freno: è un caso diverso e riceve il suo messaggio. E il freno vale per dispositivo: chi svuota i dati del sito o apre una finestra anonima riparte da zero. Serve a fermare chi prova a caso, non un attacco: contro quello vale la lunghezza del codice, otto caratteri su un alfabeto di diciotto.
+
+
+## Ragione sociale e nome breve
+
+Il foglio **Società** ha due nomi per ogni riga. La prima colonna è la **ragione sociale** esatta, quella dell'affiliazione: serve per gli atti, ma in un messaggio o in un elenco è illeggibile. L'ultima colonna è il **Nome breve**, quello con cui la società si chiama davvero.
+
+Il nome breve è quello che vedono i votanti: compare nei messaggi, sulla pagina di voto ("stai votando per…"), nel Riepilogo urna, nel Report e nei fogli dei ballottaggi. All'inizializzazione parte uguale alla ragione sociale, quindi finché non lo accorci non cambia niente; se lo lasci vuoto il programma usa comunque la ragione sociale.
+
 
 ## Logo
 

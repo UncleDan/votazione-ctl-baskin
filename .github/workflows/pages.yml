@@ -1,0 +1,60 @@
+name: Pubblica la scheda su GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scheda-html/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  pubblica:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # L'indirizzo del ponte Apps Script non sta nel codice: arriva dalla
+      # variabile PONTE del repository (Settings -> Secrets and variables ->
+      # Actions -> Variables). Cosi quando ridistribuisci lo script e l'URL
+      # cambia, aggiorni la variabile invece di modificare la pagina.
+      - name: Inserisci l'indirizzo del ponte
+        env:
+          PONTE_URL: ${{ vars.PONTE }}
+        run: |
+          if [ -z "$PONTE_URL" ]; then
+            echo "::error::Manca la variabile PONTE del repository: l'URL /exec della web app Apps Script."
+            exit 1
+          fi
+          python3 - "$PONTE_URL" <<'PY'
+          import sys, pathlib
+          p = pathlib.Path("scheda-html/index.html")
+          t = p.read_text(encoding="utf-8")
+          if "__PONTE__" not in t:
+              sys.exit("Segnaposto __PONTE__ non trovato in scheda-html/index.html")
+          p.write_text(t.replace("__PONTE__", sys.argv[1]), encoding="utf-8")
+          print("Ponte inserito:", sys.argv[1])
+          PY
+
+      - uses: actions/configure-pages@v5
+
+      # Va in rete solo questa cartella: il resto del repository (Code.gs,
+      # documentazione, test) resta nel repo ma non viene pubblicato.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: scheda-html
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

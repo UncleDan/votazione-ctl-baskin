@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Votazione CTL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Scheda in colonna singola, come un modulo di gara: intestazione fissa con il
+   contatore delle preferenze, candidati raggruppati per società, conferma, ricevuta. */
+:root{
+  --paper:#f6f5f2; --card:#ffffff; --ink:#1b1a17; --ink2:#5f5b54; --rule:#dedbd4;
+  --accent:#d9620c; --accent-soft:#fcf0e5; --ok:#2f7d4f; --ok-soft:#eaf4ee;
+  --warn:#a8401c; --warn-soft:#fbeee9;
+  --font-display:'Archivo','Helvetica Neue',Arial,sans-serif;
+  --font-body:'Source Serif 4',Georgia,'Times New Roman',serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#141418; --card:#1e1f24; --ink:#eceae6; --ink2:#a5a19a; --rule:#33353b;
+  --accent:#ff8c3b; --accent-soft:#2a1d13; --ok:#5fbd86; --ok-soft:#172218;
+  --warn:#ef8358; --warn-soft:#2a1813; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --paper:#141418; --card:#1e1f24; --ink:#eceae6; --ink2:#a5a19a; --rule:#33353b;
+  --accent:#ff8c3b; --accent-soft:#2a1d13; --ok:#5fbd86; --ok-soft:#172218;
+  --warn:#ef8358; --warn-soft:#2a1813; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font:400 16px/1.5 var(--font-body);-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+img{max-width:100%}
+
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--card);border-bottom:1px solid var(--rule)}
+.bar-in{max-width:40rem;margin:0 auto;padding:12px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+.mark{display:flex;gap:10px;align-items:center;min-width:0}
+.mark img{height:26px;width:auto;flex:none}
+.mark-t{font:600 13px/1.2 var(--font-display);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mark-s{font:400 11px/1.3 var(--font-mono);color:var(--ink2);text-transform:uppercase;letter-spacing:.07em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.count{flex:none;text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.count b{display:block;font:600 19px/1 var(--font-mono)}
+.count span{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink2)}
+.count.full b{color:var(--accent)}
+
+main{max-width:40rem;margin:0 auto;padding-block:28px 56px;padding-left:16px;padding-right:16px}
+
+/* testata: logo EISI e identita della votazione. La CTL e di una sola Sezione
+   Territoriale, quindi la sezione viene prima del titolo. */
+.testata{text-align:center;padding-bottom:22px;margin-bottom:26px;border-bottom:1px solid var(--rule)}
+.testata img{height:84px;width:auto;max-width:100%;margin:0 auto 16px;display:block}
+.sez{font:600 11px/1.4 var(--font-mono);letter-spacing:.13em;text-transform:uppercase;
+  color:var(--accent);margin:0 0 6px}
+.ente{font:600 20px/1.25 var(--font-display);margin:0;text-wrap:balance}
+.anno{font-size:13px;color:var(--ink2);margin:6px 0 0}
+h1{font:700 clamp(23px,6vw,30px)/1.15 var(--font-display);letter-spacing:-.01em;margin:0 0 10px;text-wrap:balance}
+.lede{margin:0 0 26px;color:var(--ink2);max-width:34rem}
+.eyebrow{font:600 10px/1.4 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 8px}
+
+.panel{background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:18px}
+label.fld{display:block;font:600 11px/1.4 var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);margin-bottom:7px}
+input[type=text]{width:100%;font:600 22px/1.2 var(--font-mono);letter-spacing:.14em;text-align:center;
+  padding:14px 10px;border:1px solid var(--rule);border-radius:5px;background:var(--paper);color:var(--ink);text-transform:uppercase}
+input[type=text]::placeholder{color:var(--ink2);opacity:.5}
+input[type=text]:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hint{font-size:13px;color:var(--ink2);margin:9px 0 0}
+
+.btn{display:block;width:100%;margin-top:14px;padding:14px 18px;border:none;border-radius:5px;background:var(--accent);
+  color:#fff;font:600 15px/1 var(--font-display);cursor:pointer}
+.btn:disabled{background:var(--rule);color:var(--ink2);cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--ink2);border:1px solid var(--rule)}
+.btn-row{display:flex;gap:10px;margin-top:16px}
+.btn-row .btn{margin-top:0}
+
+.club{margin-top:22px}
+.club-h{display:flex;align-items:baseline;gap:10px;padding:0 2px 7px;border-bottom:1px solid var(--rule)}
+.club-n{font:600 14px/1.25 var(--font-display);min-width:0}
+.cand{display:flex;gap:13px;align-items:flex-start;width:100%;text-align:left;padding:13px 2px;background:transparent;
+  border:none;border-bottom:1px solid var(--rule);color:inherit;font:inherit;cursor:pointer}
+.cand:last-child{border-bottom:none}
+.box{flex:none;width:23px;height:23px;margin-top:1px;border:1.5px solid var(--ink2);border-radius:3px;background:var(--card);position:relative}
+[aria-pressed="true"] .box{border-color:var(--accent);background:var(--accent)}
+[aria-pressed="true"] .box::after{content:"";position:absolute;inset:0;background:no-repeat center/13px 13px
+  url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>")}
+.cand-b{min-width:0;flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.cand-n{display:block;font:600 16px/1.3 var(--font-display)}
+.cand-m{display:block;font-size:13px;color:var(--ink2)}
+.chip{display:inline-block;margin-top:4px;padding:2px 7px;border-radius:3px;font:600 10px/1.5 var(--font-mono);
+  letter-spacing:.06em;text-transform:uppercase;background:var(--accent-soft);color:var(--accent)}
+.cand.off{opacity:.45}
+
+.bianca{margin-top:22px;border:1px dashed var(--rule);border-radius:6px;padding:14px 16px;display:flex;gap:13px;
+  align-items:flex-start;width:100%;text-align:left;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.bianca[aria-pressed="true"]{border-color:var(--accent);border-style:solid;background:var(--accent-soft)}
+
+.note{margin-top:16px;padding:12px 14px;border-left:3px solid var(--rule);font-size:13.5px;color:var(--ink2)}
+.note-warn{border-left-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
+.note-ok{border-left-color:var(--ok);background:var(--ok-soft);color:var(--ok)}
+.msg{margin-top:12px;font-size:14px;color:var(--warn);min-height:1.2em}
+
+.sum{list-style:none;margin:0;padding:0;counter-reset:p}
+.sum li{counter-increment:p;display:flex;gap:11px;padding:10px 0;border-bottom:1px solid var(--rule)}
+.sum li:last-child{border-bottom:none}
+.sum li::before{content:counter(p);flex:none;width:21px;height:21px;border-radius:50%;background:var(--accent-soft);
+  color:var(--accent);font:600 11px/21px var(--font-mono);text-align:center}
+.sum-n{font:600 15px/1.35 var(--font-display)}
+.sum-m{font-size:12.5px;color:var(--ink2)}
+
+.seal{width:52px;height:52px;margin:0 auto 16px;border-radius:50%;background:var(--ok-soft);border:1.5px solid var(--ok);position:relative}
+.seal::after{content:"";position:absolute;inset:0;background:no-repeat center/26px 26px
+  url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232f7d4f' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>")}
+.done{text-align:center;border:1px solid var(--rule);border-radius:6px;background:var(--card);padding:30px 18px}
+.done-s{font:600 10px/1.4 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink2)}
+.done-v{font:600 clamp(19px,5vw,24px)/1.25 var(--font-display);margin:10px 0 0}
+
+/* ricevuta: e la sola cosa che il votante deve portarsi via, quindi domina la pagina */
+.ric{margin-top:22px;border:2px solid var(--accent);border-radius:8px;background:var(--accent-soft);
+  padding:24px 16px;text-align:center}
+.ric-l{font:600 11px/1.4 var(--font-mono);letter-spacing:.13em;text-transform:uppercase;color:var(--accent);margin:0}
+.ric-v{font:600 clamp(34px,11vw,52px)/1.1 var(--font-mono);letter-spacing:.08em;margin:12px 0 0;
+  color:var(--ink);word-break:break-all;-webkit-user-select:all;user-select:all}
+.ric-i{margin:18px 0 0;font-size:15px;line-height:1.5;color:var(--ink)}
+.ric-i b{font-weight:600}
+
+.foot{margin-top:34px;padding-top:16px;border-top:1px solid var(--rule);font-size:12.5px;color:var(--ink2);word-break:break-word}
+.foot a{color:var(--accent)}
+.spin{display:inline-block;width:15px;height:15px;border:2px solid var(--rule);border-top-color:var(--accent);
+  border-radius:50%;vertical-align:-3px;margin-right:8px;animation:g .8s linear infinite}
+@keyframes g{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="bar-in">
+    <div class="mark">
+      <div style="min-width:0">
+        <div class="mark-t" id="hTitolo">Votazione CTL</div>
+        <div class="mark-s" id="hSotto">caricamento…</div>
+      </div>
+    </div>
+    <div class="count" id="count" hidden>
+      <b><span id="cNow">0</span>/<span id="cMax">0</span></b>
+      <span>preferenze</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<div class="testata">
+  <img id="logo" alt="Ente Italiano Sport Inclusivi" hidden>
+  <p class="sez" id="mSezione" hidden></p>
+  <p class="ente" id="mTitolo">Elezione CTL Baskin</p>
+  <p class="anno" id="mAnno" hidden></p>
+</div>
+
+<section id="s-load">
+  <p class="lede"><span class="spin"></span>Carico la votazione…</p>
+</section>
+
+<section id="s-chiusa" hidden>
+  <p class="eyebrow" id="chEyebrow">Votazione</p>
+  <h1 id="chTitolo">La votazione non è aperta</h1>
+  <p class="lede" id="chTesto"></p>
+  <p class="note" id="chNota" hidden></p>
+</section>
+
+<section id="s-accesso" hidden>
+  <p class="eyebrow" id="acEyebrow">Accesso</p>
+  <h1>Inserisci il codice della tua società</h1>
+  <p class="lede" id="acLede">Il codice è quello che hai ricevuto dal Coordinatore della Sezione Tecnica.
+  Serve solo a garantire un voto per società: la scheda viene registrata senza codice, senza nome e senza orario.</p>
+  <div class="panel">
+    <label class="fld" for="codice">Codice di voto</label>
+    <input type="text" id="codice" maxlength="9" spellcheck="false" autocomplete="off"
+           autocapitalize="characters" placeholder="ABCD-1234">
+    <p class="hint">Se hai aperto il link che ti è stato inviato, il codice è già compilato.</p>
+    <button class="btn" id="bVerifica">Apri la scheda</button>
+    <div class="msg" id="mAccesso"></div>
+  </div>
+  <p class="note" id="acNota" hidden></p>
+</section>
+
+<section id="s-scheda" hidden>
+  <p class="eyebrow" id="scVotante"></p>
+  <h1 id="scTitolo">Scegli</h1>
+  <p class="lede" id="scLede"></p>
+  <div id="lista"></div>
+  <button class="bianca" id="bBianca" aria-pressed="false">
+    <span class="box"></span>
+    <span class="cand-b">
+      <span class="cand-n">Scheda bianca</span>
+      <span class="cand-m">Deposita una scheda senza preferenze. Conta per il quorum.</span>
+    </span>
+  </button>
+  <div class="note" id="scNota" hidden></div>
+  <button class="btn" id="bAvanti" disabled>Continua</button>
+</section>
+
+<section id="s-conferma" hidden>
+  <p class="eyebrow">Ultimo passaggio</p>
+  <h1>Controlla e deposita</h1>
+  <p class="lede">Una volta depositata, la scheda non si può modificare né ritirare.
+  Il tuo codice risulterà usato.</p>
+  <div class="panel"><ol class="sum" id="sommario"></ol></div>
+  <div class="btn-row">
+    <button class="btn btn-ghost" id="bIndietro">Torna indietro</button>
+    <button class="btn" id="bInvia">Deposita la scheda</button>
+  </div>
+  <div class="msg" id="mInvio"></div>
+</section>
+
+<section id="s-fatto" hidden>
+  <p class="eyebrow">Scheda depositata</p>
+  <h1>Voto registrato</h1>
+  <p class="lede">La scheda è nell'urna, senza il tuo codice e senza l'orario.</p>
+  <div class="done">
+    <div class="seal"></div>
+    <div class="done-s">Ha votato</div>
+    <p class="done-v" id="faVotante"></p>
+  </div>
+
+  <div class="ric" id="boxRic" hidden>
+    <p class="ric-l">La tua ricevuta di voto</p>
+    <p class="ric-v" id="faRicevuta"></p>
+    <p class="ric-i"><b>Fai subito uno screenshot di questa schermata</b>, oppure
+    trascrivi la ricevuta su un foglio. Non la si può recuperare: chiusa questa
+    pagina, non la conosce più nessuno, nemmeno il Coordinatore.</p>
+  </div>
+  <button class="btn btn-ghost" id="bCopiaRic" hidden>Copia la ricevuta</button>
+  <p class="note" id="noteRic" hidden>A spoglio concluso la ricevuta comparirà nel riepilogo
+  dell'urna: ritrovarla significa che la tua scheda è stata contata. Non dice come hai votato,
+  ed è proprio per questo che il voto resta anonimo.</p>
+</section>
+
+<section id="s-errore" hidden>
+  <p class="eyebrow">Collegamento non riuscito</p>
+  <h1>Non riesco a contattare il sistema di voto</h1>
+  <p class="lede" id="erTesto"></p>
+  <button class="btn" id="bRiprova">Riprova</button>
+  <p class="note">Se l'errore si ripete, avvisa il Coordinatore della Sezione Tecnica:
+  la votazione può essere riaperta sulla app Google, dove il tuo codice vale allo stesso modo.</p>
+</section>
+
+<p class="foot" id="foot">
+  Per trasparenza il codice di questo sistema è pubblico e verificabile da chiunque:
+  <a id="fRepo" href="https://github.com/UncleDan/votazione-ctl-baskin" target="_blank" rel="noopener">github.com/UncleDan/votazione-ctl-baskin</a><span id="fVer"></span> · licenza MIT
+  <span id="fLogo" hidden><br></span>
+</p>
+
+</main>
+
+<script>
+"use strict";
+
+/* Indirizzo del ponte Apps Script. La GitHub Action lo sostituisce al momento
+   della pubblicazione, prendendolo dalla variabile PONTE del repository. */
+var PONTE = "__PONTE__";
+
+/* Freno ai tentativi a vuoto: dopo tre codici sbagliati il voto da questo
+   dispositivo resta sospeso per un'ora. Il conteggio sta in una memoria tecnica
+   del browser (localStorage): niente di personale, niente che arrivi a un
+   server, nessun tracciamento, quindi nessun banner da mostrare. E un freno,
+   non una difesa: chi svuota i dati del sito riparte da zero. La difesa vera
+   e la lunghezza del codice. */
+var MAX_TENTATIVI = 3, ATTESA_MS = 60 * 60 * 1000, CHIAVE_TENT = "ctl-tentativi";
+function tentStato() { try { return JSON.parse(localStorage.getItem(CHIAVE_TENT) || "{}"); } catch (e) { return {}; } }
+function tentSalva(s) { try { localStorage.setItem(CHIAVE_TENT, JSON.stringify(s)); } catch (e) {} }
+function tentBloccoFino() { var s = tentStato(); return (s.fino && s.fino > Date.now()) ? s.fino : 0; }
+function tentMinuti(f) { return Math.max(1, Math.ceil((f - Date.now()) / 60000)); }
+function tentErrore() {
+  var s = tentStato();
+  s.n = (s.n || 0) + 1;
+  if (s.n >= MAX_TENTATIVI) { s.fino = Date.now() + ATTESA_MS; s.n = 0; }
+  tentSalva(s);
+}
+function tentAzzera() { tentSalva({}); }
+
+var $ = function (id) { return document.getElementById(id); };
+var SEZ = ["s-load", "s-chiusa", "s-accesso", "s-scheda", "s-conferma", "s-fatto", "s-errore"];
+var INFO = null, CODICE = "", scelte = [], bianca = false;
+
+function show(id) {
+  SEZ.forEach(function (s) { $(s).hidden = (s !== id); });
+  $("count").hidden = (id !== "s-scheda");
+  window.scrollTo(0, 0);
+}
+
+/* Richiesta "semplice": corpo di testo e nessuna intestazione aggiunta, così il
+   browser non manda il preflight, che Apps Script non sa gestire. */
+function chiama(payload) {
+  if (/^__/.test(PONTE)) {
+    return Promise.reject(new Error("Indirizzo del ponte non configurato nella pubblicazione."));
+  }
+  return fetch(PONTE, { method: "POST", body: JSON.stringify(payload) })
+    .then(function (r) {
+      if (!r.ok) throw new Error("Risposta " + r.status);
+      return r.json();
+    });
+}
+
+function erroreRete(e) {
+  $("erTesto").textContent = (e && e.message ? e.message : String(e)) +
+    ". Può essere la rete del telefono, oppure il ponte non risponde.";
+  show("s-errore");
+}
+
+/* ---------------- avvio ---------------- */
+function codiceDalLink() {
+  var h = (location.hash || "").replace(/^#/, "");
+  var m = /(?:^|[?&])c=([A-Za-z0-9-]+)/.exec(h) || /^([A-Za-z0-9-]+)$/.exec(h);
+  return m ? m[1] : "";
+}
+
+function formatta(c) {
+  var n = String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return n.length > 4 ? n.slice(0, 4) + "-" + n.slice(4, 8) : n;
+}
+
+function avvia() {
+  show("s-load");
+  chiama({ azione: "info" }).then(function (i) {
+    INFO = i;
+    $("hTitolo").textContent = i.titolo || "Votazione CTL";
+    $("hSotto").textContent = i.intestazione || "";
+    $("mTitolo").textContent = i.titolo || "Elezione CTL Baskin";
+    if (i.sezione) {
+      $("mSezione").textContent = "Sezione Territoriale " + i.sezione;
+      $("mSezione").hidden = false;
+    }
+    if (i.anno) {
+      $("mAnno").textContent = "Anno sportivo " + i.anno;
+      $("mAnno").hidden = false;
+    }
+    if (i.logo) {
+      var img = $("logo");
+      img.onerror = function () { this.hidden = true; };
+      img.src = i.logo;
+      img.hidden = false;
+    }
+    if (i.repo) { $("fRepo").href = i.repo; $("fRepo").textContent = i.repo.replace(/^https?:\/\//, ""); }
+    if (i.versione) $("fVer").textContent = " · versione " + i.versione;
+    if (i.logo && i.proprietaLogo) {
+      $("fLogo").appendChild(document.createTextNode(i.proprietaLogo));
+      $("fLogo").hidden = false;
+    }
+    $("cMax").textContent = i.max || 0;
+    if (!i.aperta) {
+      $("chEyebrow").textContent = i.titolo || "Votazione";
+      $("chTitolo").textContent = i.avviso ? "Si vota da un'altra pagina" : "La votazione non è aperta";
+      $("chTesto").textContent = i.avviso || "L'urna di questo round non è aperta. Riprova più tardi.";
+      if (i.programma && !i.avviso) { $("chNota").textContent = i.programma; $("chNota").hidden = false; }
+      return show("s-chiusa");
+    }
+    $("acEyebrow").textContent = i.sottotitolo || "Accesso";
+    if (i.programma) { $("acNota").textContent = i.programma; $("acNota").hidden = false; }
+    var c = codiceDalLink();
+    $("codice").value = formatta(c);
+    show("s-accesso");
+    if (aggiornaBlocco()) return;
+    if (c) verifica();
+  }).catch(erroreRete);
+}
+
+/* ---------------- codice ---------------- */
+/** Se il freno e attivo mostra quanto manca e blocca il pulsante. */
+function aggiornaBlocco() {
+  var f = tentBloccoFino();
+  if (!f) {
+    $("bVerifica").disabled = false;
+    $("bVerifica").textContent = "Apri la scheda";
+    return false;
+  }
+  $("bVerifica").disabled = true;
+  $("mAccesso").textContent = "Codice sbagliato tre volte: per sicurezza il voto da questo dispositivo " +
+    "riprende fra " + tentMinuti(f) + " minuti. Se non trovi il codice, chiedilo al Coordinatore " +
+    "della Sezione Tecnica.";
+  return true;
+}
+
+function verifica() {
+  if (aggiornaBlocco()) return;
+  var c = $("codice").value.trim();
+  $("mAccesso").textContent = "";
+  if (!c) { $("mAccesso").textContent = "Inserisci il codice."; return; }
+  $("bVerifica").disabled = true;
+  $("bVerifica").textContent = "Verifico…";
+  chiama({ azione: "verifica", codice: c }).then(function (r) {
+    $("bVerifica").disabled = false;
+    $("bVerifica").textContent = "Apri la scheda";
+    if (!r.ok) {
+      if (r.motivo === "codice") { tentErrore(); if (aggiornaBlocco()) return; }
+      $("mAccesso").textContent = r.err;
+      return;
+    }
+    tentAzzera();
+    CODICE = c;
+    $("scVotante").textContent = (INFO.prefisso || "") + r.votante;
+    $("faVotante").textContent = r.votante;
+    costruisci();
+    show("s-scheda");
+  }).catch(function (e) {
+    $("bVerifica").disabled = false;
+    $("bVerifica").textContent = "Apri la scheda";
+    erroreRete(e);
+  });
+}
+
+/* ---------------- scheda ---------------- */
+function costruisci() {
+  $("scTitolo").textContent = INFO.max === 1 ? "Scegli un nome" : "Scegli i commissari";
+  $("scLede").textContent = (INFO.eletti ? "Posti da assegnare: " + INFO.eletti + ". " : "") +
+    (INFO.messaggio || "") +
+    (INFO.max > 1 ? " Puoi dare fino a " + INFO.max + " preferenze; l'ordine non conta." : "");
+
+  var lista = $("lista");
+  lista.innerHTML = "";
+  var gruppi = [], indice = {};
+  INFO.candidati.forEach(function (k, i) {
+    var g = k.societa || k.squadraNome || "";
+    if (!(g in indice)) { indice[g] = gruppi.length; gruppi.push({ nome: g, voci: [] }); }
+    gruppi[indice[g]].voci.push({ k: k, i: i });
+  });
+  gruppi.forEach(function (g) {
+    var wrap = document.createElement("div");
+    wrap.className = "club";
+    if (g.nome) {
+      var h = document.createElement("div");
+      h.className = "club-h";
+      var n = document.createElement("span");
+      n.className = "club-n";
+      n.textContent = g.nome;
+      h.appendChild(n);
+      wrap.appendChild(h);
+    }
+    g.voci.forEach(function (v) {
+      var b = document.createElement("button");
+      b.className = "cand";
+      b.type = "button";
+      b.setAttribute("aria-pressed", "false");
+      b.dataset.nome = v.k.nome;
+      var box = document.createElement("span"); box.className = "box";
+      var body = document.createElement("span"); body.className = "cand-b";
+      var nm = document.createElement("span"); nm.className = "cand-n"; nm.textContent = v.k.nome;
+      body.appendChild(nm);
+      var det = v.k.squadraNome || v.k.squadra || "";
+      if (det) { var m = document.createElement("span"); m.className = "cand-m"; m.textContent = det; body.appendChild(m); }
+      if (/aiuto/i.test(v.k.qualifica || "")) {
+        var chip = document.createElement("span");
+        chip.className = "chip";
+        chip.textContent = "aiuto allenatore";
+        body.appendChild(chip);
+      }
+      b.appendChild(box); b.appendChild(body);
+      b.addEventListener("click", function () { tocca(v.k.nome, b); });
+      wrap.appendChild(b);
+    });
+    lista.appendChild(wrap);
+  });
+
+  if (INFO.maxAiuti && INFO.candidati.some(function (x) { return /aiuto/i.test(x.qualifica || ""); })) {
+    $("scNota").textContent = "Gli aiuto allenatore puoi votarli liberamente: entrano in commissione solo se " +
+      "non bastano gli altri candidati a coprire i posti, e comunque al massimo " + INFO.maxAiuti + ".";
+    $("scNota").hidden = false;
+  }
+  scelte = []; bianca = false;
+  $("bBianca").setAttribute("aria-pressed", "false");
+  aggiorna();
+}
+
+function tocca(nome, btn) {
+  if (bianca) { bianca = false; $("bBianca").setAttribute("aria-pressed", "false"); }
+  var i = scelte.indexOf(nome);
+  if (i >= 0) {
+    scelte.splice(i, 1);
+  } else if (INFO.max === 1) {
+    scelte = [nome];
+    document.querySelectorAll(".cand").forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+  } else if (scelte.length >= INFO.max) {
+    $("scNota").className = "note note-warn";
+    $("scNota").textContent = "Hai già dato tutte e " + INFO.max + " le preferenze. Togline una per sceglierne un'altra.";
+    $("scNota").hidden = false;
+    return;
+  } else {
+    scelte.push(nome);
+  }
+  btn.setAttribute("aria-pressed", scelte.indexOf(nome) >= 0 ? "true" : "false");
+  aggiorna();
+}
+
+function aggiorna() {
+  $("cNow").textContent = scelte.length;
+  $("count").classList.toggle("full", scelte.length === INFO.max);
+  document.querySelectorAll(".cand").forEach(function (b) { b.classList.toggle("off", bianca); });
+  $("bAvanti").disabled = !bianca && scelte.length === 0;
+}
+
+/* ---------------- conferma ---------------- */
+function riepilogo() {
+  var ol = $("sommario");
+  ol.innerHTML = "";
+  if (bianca || !scelte.length) {
+    var li = document.createElement("li");
+    li.innerHTML = '<span class="sum-n">Scheda bianca</span>';
+    li.style.listStyle = "none";
+    ol.appendChild(li);
+  } else {
+    scelte.forEach(function (nome) {
+      var k = INFO.candidati.filter(function (x) { return x.nome === nome; })[0] || {};
+      var li = document.createElement("li");
+      var w = document.createElement("span");
+      var n = document.createElement("span"); n.className = "sum-n"; n.textContent = nome;
+      w.appendChild(n);
+      var det = [k.squadraNome || k.squadra, (k.qualifica || "").toLowerCase()].filter(Boolean).join(" · ");
+      if (det) {
+        w.appendChild(document.createElement("br"));
+        var m = document.createElement("span"); m.className = "sum-m"; m.textContent = det;
+        w.appendChild(m);
+      }
+      li.appendChild(w);
+      ol.appendChild(li);
+    });
+  }
+  $("mInvio").textContent = "";
+  show("s-conferma");
+}
+
+function invia() {
+  $("bInvia").disabled = true;
+  $("bInvia").textContent = "Deposito…";
+  chiama({ azione: "voto", codice: CODICE, scelte: bianca ? [] : scelte, ctx: INFO.ctx }).then(function (r) {
+    $("bInvia").disabled = false;
+    $("bInvia").textContent = "Deposita la scheda";
+    if (!r.ok) { $("mInvio").textContent = r.err; return; }
+    CODICE = "";
+    if (r.ricevuta) {
+      $("faRicevuta").textContent = r.ricevuta;
+      $("boxRic").hidden = false;
+      $("bCopiaRic").hidden = false;
+      $("noteRic").hidden = false;
+    }
+    show("s-fatto");
+  }).catch(function (e) {
+    $("bInvia").disabled = false;
+    $("bInvia").textContent = "Deposita la scheda";
+    $("mInvio").textContent = "Non sono riuscito a depositare la scheda: " + ((e && e.message) || e) +
+      ". Il voto NON è stato registrato: riprova.";
+  });
+}
+
+/* ---------------- collegamenti ---------------- */
+$("bVerifica").addEventListener("click", verifica);
+$("codice").addEventListener("keydown", function (e) { if (e.key === "Enter") verifica(); });
+$("codice").addEventListener("blur", function () { this.value = formatta(this.value); });
+$("bBianca").addEventListener("click", function () {
+  bianca = !bianca;
+  this.setAttribute("aria-pressed", bianca ? "true" : "false");
+  if (bianca) {
+    scelte = [];
+    document.querySelectorAll(".cand").forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+  }
+  aggiorna();
+});
+$("bAvanti").addEventListener("click", riepilogo);
+$("bIndietro").addEventListener("click", function () { show("s-scheda"); });
+$("bInvia").addEventListener("click", invia);
+$("bCopiaRic").addEventListener("click", function () {
+  var testo = $("faRicevuta").textContent.trim();
+  var b = this;
+  function fallback() {
+    var rg = document.createRange();
+    rg.selectNodeContents($("faRicevuta"));
+    var sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(rg);
+    b.textContent = "Selezionata: copiala a mano";
+  }
+  try {
+    navigator.clipboard.writeText(testo).then(function () {
+      b.textContent = "Ricevuta copiata";
+    }, fallback);
+  } catch (e) { fallback(); }
+  setTimeout(function () { b.textContent = "Copia la ricevuta"; }, 2800);
+});
+$("bRiprova").addEventListener("click", avvia);
+setInterval(function () { if (!$("s-accesso").hidden) aggiornaBlocco(); }, 20000);
+
+avvia();
+</script>
+</body>
+</html>
