@@ -86,9 +86,43 @@ verifica(com.length === 3 && com.every(x => /^[A-H]{4}-[0-9]{4}$/.test(x.codice)
 verifica(!!trig('triggerChiudePresidente'), 'programmata la chiusura del voto Presidente');
 verifica(foglio('Risultati ballottaggi').getLastRow() > 1, 'foglio "Risultati ballottaggi" compilato');
 
-console.log('\n=== Chiusura manuale durante un ballottaggio');
+console.log('\n=== Presidente: parità che nessun ballottaggio risolve → sorteggio');
+const codCom = com.map(x => x.codice);
+const ctx2 = getInfo().ctx;
+inviaVoto(codCom[0], [com[1].nome], ctx2);      // 1 voto a B
+inviaVoto(codCom[1], [com[2].nome], ctx2);      // 1 voto a C (stessi anni)
+inviaVoto(codCom[2], [], ctx2);                 // scheda bianca
+daTrigger('triggerChiudePresidente');
+verifica(ballottaggioAttivo_(cfg_()) === 1, 'parità sul Presidente: ballottaggio 1 aperto in automatico');
+
+for (let n = 1; n <= 3; n++) {
+  const cb = codici('Ballottaggio', 1);
+  const cx = getInfo().ctx;
+  inviaVoto(cb[0], [com[1].nome], cx);
+  inviaVoto(cb[1], [com[2].nome], cx);
+  inviaVoto(cb[2], [], cx);
+  daTrigger('triggerChiudeBallottaggio');
+  if (n < 3) verifica(ballottaggioAttivo_(cfg_()) === n + 1, 'parità persiste: aperto in automatico il ballottaggio ' + (n + 1));
+}
+
+const stFin = balState_(2);
+verifica(!!stFin.sorteggiato && stFin.stato === 'risolto',
+  'dopo 3 ballottaggi senza esito: parità risolta per sorteggio');
+const eletto = String(cfg_()['Presidente']).trim();
+verifica([com[1].nome, com[2].nome].indexOf(eletto) >= 0, 'Presidente proclamato dal sorteggio: ' + eletto);
+verifica(foglio('Risultati Presidente').d.some(r => /sorteggio/i.test(String(r[6]))),
+  'nei risultati la nota "Eletto per sorteggio"');
+verifica(foglio('Risultati ballottaggi').d.some(r => /SORTEGGIO/.test(String(r[0]))),
+  'il sorteggio è registrato nel foglio "Risultati ballottaggi"');
+verifica(/Risultati finali/i.test(ultimaMail().subject),
+  'la catena prosegue da sola: email con i risultati finali');
+verifica(!aperta_(cfg_()) && !trig('triggerChiudeBallottaggio'), 'nessuna votazione aperta e nessun trigger pendente');
+
+console.log('\n=== Chiusura manuale di una votazione a tempo');
+apri3();
+creaTrigger_('triggerChiudeBallottaggio', fra(5));
 chiudiVotazione();
-verifica(!trig('triggerChiudeBallottaggio'), 'nessun trigger di ballottaggio pendente dopo la chiusura');
+verifica(!aperta_(cfg_()), 'chiusura manuale eseguita');
 
 console.log(errori ? '\n' + errori + ' verifiche fallite.' : '\nTutte le verifiche superate.');
 process.exit(errori ? 1 : 0);

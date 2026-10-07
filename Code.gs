@@ -85,7 +85,8 @@ function onOpen() {
       .addItem('Prepara ballottaggio e nuovi link', 'preparaBallottaggio')
       .addItem('Apri', 'apriBallottaggio')
       .addItem('Chiudi', 'chiudiVotazione')
-      .addItem('Calcola ballottaggio', 'calcolaBallottaggio'))
+      .addItem('Calcola ballottaggio', 'calcolaBallottaggio')
+      .addItem('Sorteggia la parità residua…', 'sorteggiaParita'))
     .addSubMenu(ui.createMenu('Votazioni programmate')
       .addItem('Programma apertura e chiusura', 'programmaVotazioni')
       .addItem('Mostra pianificazione', 'mostraPianificazione')
@@ -678,7 +679,10 @@ function stessoGruppo_(a, b) {
 function applicaBallottaggio_(r, ass) {
   const st = balState_(r);
   if (!st || !ass.tie || !stessoGruppo_(st.orig, ass.tie)) return;
-  st.eletti.forEach(e => ass.esito[e.nome] = { esito: 'ELETTO', nota: 'Eletto al ballottaggio ' + e.n });
+  st.eletti.forEach(e => ass.esito[e.nome] = {
+    esito: 'ELETTO',
+    nota: e.sorteggio ? 'Eletto per sorteggio dopo ' + MAX_BALLOTTAGGI + ' ballottaggi' : 'Eletto al ballottaggio ' + e.n
+  });
   st.orig.candidati.forEach(nome => {
     if (st.eletti.some(e => e.nome === nome)) return;
     if (st.stato !== 'risolto' && st.candidati.indexOf(nome) >= 0) {
@@ -811,16 +815,20 @@ function scriviRisultatiBallottaggi_() {
     if (!st) return;
     st.storico.forEach(b => {
       rows.push(R(''));
-      rows.push(R('Round ' + r + ' – ' + ROUND[r].nome + ' · Ballottaggio ' + b.n + ': ' + b.posti +
-        (b.posti === 1 ? ' posto' : ' posti') + ' tra ' + b.candidati.length + ' candidati'));
+      rows.push(R('Round ' + r + ' – ' + ROUND[r].nome + (b.sorteggio
+        ? ' · SORTEGGIO dopo ' + MAX_BALLOTTAGGI + ' ballottaggi: ' + b.posti + (b.posti === 1 ? ' posto' : ' posti') + ' tra ' + b.candidati.length + ' candidati'
+        : ' · Ballottaggio ' + b.n + ': ' + b.posti + (b.posti === 1 ? ' posto' : ' posti') + ' tra ' + b.candidati.length + ' candidati')));
       head.push(rows.length);
-      rows.push(R('Candidato', 'Voti', 'Esito'));
+      rows.push(R('Candidato', b.sorteggio ? 'Esito del sorteggio' : 'Voti', b.sorteggio ? '' : 'Esito'));
       const pari = b.pari || [];
-      b.candidati.forEach(n => rows.push(R(n, b.voti[n],
-        b.eletti.indexOf(n) >= 0 ? 'ELETTO' : (pari.indexOf(n) >= 0 ? 'Ancora in parità' : 'Non eletto'))));
-      rows.push(R('Schede', b.schede, 'di cui bianche: ' + b.bianche));
+      b.candidati.forEach(n => rows.push(b.sorteggio
+        ? R(n, b.eletti.indexOf(n) >= 0 ? 'ELETTO (sorteggio)' : 'Non eletto')
+        : R(n, b.voti[n], b.eletti.indexOf(n) >= 0 ? 'ELETTO' : (pari.indexOf(n) >= 0 ? 'Ancora in parità' : 'Non eletto'))));
+      if (b.sorteggio) rows.push(R('Sorteggio eseguito il', b.quando || ''));
+      else rows.push(R('Schede', b.schede, 'di cui bianche: ' + b.bianche));
     });
-    rows.push(R('Stato finale round ' + r, st.stato === 'risolto' ? 'Parità risolta'
+    rows.push(R('Stato finale round ' + r, st.sorteggiato ? 'Parità risolta per sorteggio'
+      : st.stato === 'risolto' ? 'Parità risolta'
       : st.stato === 'irrisolto' ? 'Parità non risolta dopo ' + MAX_BALLOTTAGGI + ' ballottaggi: decisione manuale'
       : 'In corso (ballottaggio ' + st.n + ')'));
   });
@@ -1076,6 +1084,48 @@ function concludiPresidente_() {
     '\n\nResta da eleggere il Vice (round 3), da aprire dal menu: i commissari usano lo stesso link.');
 }
 
+/**
+ * Risolve per sorteggio la parità rimasta dopo il massimo dei ballottaggi.
+ * L'estrazione è registrata nel foglio "Risultati ballottaggi" e nei risultati
+ * del round (nota "Eletto per sorteggio"). Restituisce i nomi estratti.
+ */
+function sorteggio_(r) {
+  const st = balState_(r);
+  if (!st || st.stato !== 'irrisolto' || !st.candidati.length) return null;
+  const urna = st.candidati.slice();
+  const estratti = [];
+  for (let i = 0; i < st.posti && urna.length; i++) {
+    const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, Utilities.getUuid() + Math.random());
+    estratti.push(urna.splice(((bytes[0] + 256) % 256) % urna.length, 1)[0]);
+  }
+  const quando = Utilities.formatDate(new Date(), FUSO, 'dd/MM/yyyy HH:mm');
+  st.storico.push({ n: st.n, sorteggio: true, quando: quando, candidati: st.candidati.slice(),
+    posti: st.posti, voti: {}, schede: 0, bianche: 0, eletti: estratti.slice(), pari: [] });
+  estratti.forEach(n => st.eletti.push({ nome: n, n: st.n, sorteggio: true }));
+  st.candidati = [];
+  st.posti = 0;
+  st.stato = 'risolto';
+  st.sorteggiato = true;
+  setBalState_(r, st);
+  scriviRisultatiBallottaggi_();
+  if (r === 1) calcolaRisultati_(true); else calcolaCarica_(r, true);
+  return { estratti: estratti, quando: quando, esclusi: urna };
+}
+
+/** Voce di menu: sorteggio della parità residua, con conferma. */
+function sorteggiaParita() {
+  const ui = ui_();
+  const c = cfg_();
+  const r = roundAttivo_(c);
+  const st = balState_(r);
+  if (!st || st.stato !== 'irrisolto')
+    return ui.alert('Nessuna parità da sorteggiare: il sorteggio si usa solo dopo ' + MAX_BALLOTTAGGI + ' ballottaggi senza esito.');
+  if (ui.alert('Sorteggio', 'Estrarre a sorte ' + st.posti + (st.posti === 1 ? ' nome' : ' nomi') + ' fra ' +
+      st.candidati.join(', ') + '? L\'esito è definitivo e viene registrato nei risultati.', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  const s = sorteggio_(r);
+  ui.alert(s ? 'Sorteggio del ' + s.quando + ': estratti ' + s.estratti.join(', ') + '.' : 'Sorteggio non eseguito.');
+}
+
 /** Ore di durata di un ballottaggio aperto in automatico. */
 function oreBallottaggio_(c) {
   const n = Number(String(c['Durata ballottaggio (ore)'] || '').toString().replace(',', '.'));
@@ -1090,13 +1140,8 @@ function avviaBallottaggio_(r) {
   const prima = balState_(r);
   preparaBallottaggio();
   const st = balState_(r);
-  if (!st || st.stato === 'irrisolto' || (prima && st.n === (prima.n || 0) && prima.stato === 'irrisolto')) {
-    notifica_('Parità da risolvere a mano',
-      'La parità del round ' + r + ' – ' + ROUND[r].nome + ' non è stata risolta nei ' + MAX_BALLOTTAGGI +
-      ' ballottaggi previsti: va decisa manualmente (es. sorteggio).\n' +
-      (r === 1 ? 'Scrivi l\'esito nella colonna Esito del foglio "Risultati".' : 'Scrivi il nome in Config → ' + ROUND[r].cfg + '.'));
-    return;
-  }
+  if (!st || st.stato === 'irrisolto' || (prima && st.n === (prima.n || 0) && prima.stato === 'irrisolto'))
+    return sorteggiaEProsegui_(r);
   apriBallottaggio();
   const c = cfg_();
   if (!aperta_(c) || !ballottaggioAttivo_(c)) {
@@ -1120,6 +1165,22 @@ function avviaBallottaggio_(r) {
     'ATTENZIONE: i link precedenti non valgono, invia a ogni votante il SUO nuovo link:\n' + elenco);
 }
 
+/** Dopo il massimo dei ballottaggi la parità si risolve a sorte e la catena prosegue. */
+function sorteggiaEProsegui_(r) {
+  const s = sorteggio_(r);
+  if (!s) {
+    notifica_('Parità da risolvere a mano',
+      'La parità del round ' + r + ' – ' + ROUND[r].nome + ' non è stata risolta e il sorteggio automatico non è riuscito: ' +
+      (r === 1 ? 'scrivi l\'esito nella colonna Esito del foglio "Risultati".' : 'scrivi il nome in Config → ' + ROUND[r].cfg + '.'));
+    return;
+  }
+  notifica_('Parità risolta per sorteggio',
+    'Dopo ' + MAX_BALLOTTAGGI + ' ballottaggi la parità del round ' + r + ' – ' + ROUND[r].nome + ' è stata risolta per sorteggio (' + s.quando + ').\n\n' +
+    'Estratti: ' + s.estratti.join(', ') + (s.esclusi.length ? '\nNon estratti: ' + s.esclusi.join(', ') : '') +
+    '\n\nIl sorteggio è registrato nel foglio "Risultati ballottaggi" e nei risultati del round.');
+  if (r === 1) proseguiDopoRound1_(); else concludiPresidente_();
+}
+
 function triggerChiudeBallottaggio() {
   LOG_.length = 0;
   const c = cfg_();
@@ -1130,13 +1191,7 @@ function triggerChiudeBallottaggio() {
   calcolaBallottaggio();
   const st = balState_(r);
   if (st && st.stato === 'calcolato') return avviaBallottaggio_(r);   // parità residua: ballottaggio successivo
-  if (!st || st.stato === 'irrisolto') {
-    notifica_('Parità da risolvere a mano',
-      'Dopo ' + MAX_BALLOTTAGGI + ' ballottaggi la parità del round ' + r + ' – ' + ROUND[r].nome +
-      ' resta: va decisa manualmente (es. sorteggio).\n' +
-      (r === 1 ? 'Scrivi l\'esito nella colonna Esito del foglio "Risultati".' : 'Scrivi il nome in Config → ' + ROUND[r].cfg + '.'));
-    return;
-  }
+  if (!st || st.stato === 'irrisolto') return sorteggiaEProsegui_(r);
   notifica_('Ballottaggio ' + st.n + ' concluso',
     'Il ballottaggio ' + st.n + ' del round ' + r + ' – ' + ROUND[r].nome + ' ha risolto la parità: eletti ' +
     st.eletti.map(x => x.nome).join(', ') + '.');

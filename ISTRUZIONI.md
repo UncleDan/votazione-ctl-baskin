@@ -60,7 +60,7 @@ Se sull'ultimo posto utile ci sono candidati con **pari preferenze e pari anni**
 2. **Ballottaggio → Apri / Chiudi / Calcola ballottaggio**.
 3. Sulla scheda compaiono solo i candidati a pari merito; si esprimono fino a tante preferenze quanti sono i posti in parità (es. 2 posti tra 3 nomi → 2 preferenze). Si sommano i voti.
 4. Se resta una parità, per esempio tra due candidati per l'ultimo posto, chi ha già superato la soglia è eletto e si prepara il ballottaggio successivo, con nuovi link, solo tra i rimasti pari.
-5. **Massimo 3 ballottaggi**: se la parità persiste va risolta manualmente (es. sorteggio) scrivendo l'esito nella colonna Esito di *Risultati* (round 1) o il nome in *Config* (Presidente/Vice).
+5. **Massimo 3 ballottaggi**: se la parità persiste si usa **Ballottaggio → Sorteggia la parità residua…** (chiede conferma, estrae i nomi mancanti e aggiorna i risultati con la nota "Eletto per sorteggio"); in alternativa si può sempre scrivere l'esito a mano nella colonna Esito di *Risultati* (round 1) o il nome in *Config* (Presidente/Vice). Con le votazioni programmate il sorteggio è automatico.
 
 Il foglio *Risultati ballottaggi* riporta ogni ballottaggio con voti ed esito; i risultati del round vengono ricalcolati da soli ("Eletto al ballottaggio 1", ecc.).
 
@@ -87,7 +87,8 @@ Il voto commissari e il voto per il Presidente possono aprirsi e chiudersi da so
 Cosa succede alla chiusura programmata:
 
 - **Se hanno votato tutti**: la votazione si chiude, i risultati vengono calcolati e, per il round 1, i commissari eletti ricevono codice e link e si apre il voto per il Presidente (subito o alla data indicata). Alla chiusura del voto Presidente vengono calcolati i risultati finali. Ogni passaggio è notificato per email, con codici e link da inoltrare.
-- **Se c'è una parità** (e hanno votato tutti): il **ballottaggio viene preparato e aperto in automatico** fra i soli candidati a pari merito, con nuovi codici e link per tutti i votanti inviati nell'email, e con chiusura programmata dopo le ore indicate in Config. Alla chiusura vale la stessa regola: se manca qualcuno si proroga, se hanno votato tutti si calcola e, se la parità resta, parte da solo il ballottaggio successivo (massimo 3). Risolta la parità la catena riprende: commissari pronti e voto per il Presidente aperto, oppure risultati finali. Dopo il terzo ballottaggio senza esito arriva l'avviso di risolvere a mano (es. sorteggio).
+- **Se c'è una parità** (e hanno votato tutti): il **ballottaggio viene preparato e aperto in automatico** fra i soli candidati a pari merito, con nuovi codici e link per tutti i votanti inviati nell'email, e con chiusura programmata dopo le ore indicate in Config. Alla chiusura vale la stessa regola: se manca qualcuno si proroga, se hanno votato tutti si calcola e, se la parità resta, parte da solo il ballottaggio successivo (massimo 3). Risolta la parità la catena riprende: commissari pronti e voto per il Presidente aperto, oppure risultati finali.
+- **Se nemmeno i 3 ballottaggi risolvono**: il sistema esegue il **sorteggio** fra i candidati rimasti pari, lo registra (data e ora nel foglio *Risultati ballottaggi*, nota "Eletto per sorteggio" nei risultati del round), avvisa per email e prosegue da solo con il round successivo.
 - **Se manca anche un solo voto**: non si calcola e non si prosegue. La votazione **resta aperta** e la chiusura è **prorogata** delle ore indicate in Config, con una email che elenca chi non ha ancora votato. Le proroghe non hanno limite.
 - **In qualsiasi momento puoi chiudere a mano** dal menu: la chiusura manuale annulla la proroga automatica e la decisione su come proseguire resta a te.
 
@@ -117,7 +118,7 @@ La cartella `test/` contiene due simulazioni eseguibili con Node.js:
 
 - `node test/simulazione.js`: 11 società e 16 squadre, parità al round 1 risolta con due ballottaggi, parità sul Presidente risolta con un ballottaggio, parità irrisolta dopo 3 ballottaggi;
 - `node test/simulazione-programmata.js`: generazione e rigenerazione dei codici, apertura e chiusura a tempo, proroga automatica con elenco dei mancanti, catena commissari → Presidente, chiusura manuale che ferma la proroga;
-- `node test/simulazione-ballottaggio-automatico.js`: parità alla chiusura programmata, ballottaggio preparato e aperto da solo con nuovi link, proroga del ballottaggio, parità risolta e catena che riprende da sola.
+- `node test/simulazione-ballottaggio-automatico.js`: parità alla chiusura programmata, ballottaggio preparato e aperto da solo con nuovi link, proroga del ballottaggio, parità risolta e catena che riprende da sola, parità che resiste a 3 ballottaggi e viene chiusa dal sorteggio.
 
 ## Altre voci del menu
 
