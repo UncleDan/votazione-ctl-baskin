@@ -1,6 +1,6 @@
 /**
  * Votazione CTL Baskin — voto online anonimo, un voto per società
- * v8 — Google Apps Script legato a un Foglio Google
+ * v9 — Google Apps Script legato a un Foglio Google
  *
  * Codice sorgente: https://github.com/UncleDan/votazione-ctl-baskin
  * Copyright (c) 2026 Daniele Lolli (UncleDan) — Licenza MIT (vedi LICENSE)
@@ -16,6 +16,10 @@
  * Ballottaggio: una parità non risolvibile (pari preferenze e pari anni)
  *          sui posti in palio si risolve con fino a 3 ballottaggi a voto
  *          multiplo tra i soli candidati a pari merito, ciascuno con nuovi link.
+ * Pianificazione: il voto commissari può aprirsi e chiudersi da solo a data e
+ *          ora prefissate; alla chiusura i risultati vengono calcolati, i
+ *          commissari eletti ricevono codice e link e si apre il voto per il
+ *          Presidente, chiuso a sua volta a tempo con calcolo finale.
  * Formatore di riferimento: indicato senza votazione (Config).
  * Report, Riepilogo urna per il custode, link al codice sorgente.
  *
@@ -30,7 +34,7 @@ const SH = {
   RP: 'Risultati Presidente', RV: 'Risultati Vice', REP: 'Report', URNA: 'Riepilogo urna'
 };
 const REPO_URL = 'https://github.com/UncleDan/votazione-ctl-baskin';
-const VERSIONE = 'v8';
+const VERSIONE = 'v9';
 const LOGO_SVG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg';
 const LOGO_PNG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png';
 const PROPRIETA_LOGO = 'Logo © Ente Italiano Sport Inclusivi (EISI), tutti i diritti riservati';
@@ -47,7 +51,11 @@ const CAND_HEADER = ['Candidato', 'Qualifica', 'Squadra', 'Anni tesseramento/inc
 const COM_HEADER = ['Commissario', 'Qualifica', 'Squadra', 'Codice', 'Link diretto di voto', 'Votato Presidente', 'Votato Vice'];
 const BAL_HEADER = ['Votante', 'Codice ballottaggio', 'Link diretto di voto', 'Ha votato'];
 const RIS_HEADER = ['Posizione', 'Candidato', 'Qualifica', 'Squadra', 'Preferenze', 'Anni (spareggio)', 'Esito', 'Note'];
-const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // niente 0/O, 1/I
+const LETTERE = 'ABCDEFGH';      // codici: 4 lettere A–H
+const CIFRE = '0123456789';      // + 4 cifre, nel formato XXXX-9999
+const FUSO = 'Europe/Rome';
+const TRIGGER_FN = ['triggerApreCommissari', 'triggerChiudeCommissari', 'triggerAprePresidente', 'triggerChiudePresidente', 'triggerChiudeBallottaggio'];
+const LOG_ = [];                 // messaggi raccolti quando si lavora senza interfaccia (trigger)
 const QUALIFICHE = ['Allenatore', 'Aiuto allenatore', 'Autocandidatura'];
 const BLU = '#e8eaf6';
 
@@ -58,12 +66,14 @@ function onOpen() {
   ui.createMenu('🗳️ Votazione')
     .addItem('Inizializza / aggiorna fogli', 'setup')
     .addSubMenu(ui.createMenu('Round 1 – Commissari CTL')
-      .addItem('Genera codici e link società', 'generaCodici')
+      .addItem('Genera codici e link mancanti', 'generaCodici')
+      .addItem('Rigenera TUTTI i codici e link società…', 'rigeneraCodiciSocieta')
       .addItem('Apri', 'apri1')
       .addItem('Chiudi', 'chiudiVotazione')
       .addItem('Calcola risultati', 'calcola1'))
     .addSubMenu(ui.createMenu('Round 2 – Presidente')
       .addItem('Prepara commissari e link', 'preparaCommissari')
+      .addItem('Rigenera codici e link commissari…', 'rigeneraCodiciCommissari')
       .addItem('Apri', 'apri2')
       .addItem('Chiudi', 'chiudiVotazione')
       .addItem('Calcola risultati', 'calcola2'))
@@ -75,7 +85,12 @@ function onOpen() {
       .addItem('Prepara ballottaggio e nuovi link', 'preparaBallottaggio')
       .addItem('Apri', 'apriBallottaggio')
       .addItem('Chiudi', 'chiudiVotazione')
-      .addItem('Calcola ballottaggio', 'calcolaBallottaggio'))
+      .addItem('Calcola ballottaggio', 'calcolaBallottaggio')
+      .addItem('Sorteggia la parità residua…', 'sorteggiaParita'))
+    .addSubMenu(ui.createMenu('Votazioni programmate')
+      .addItem('Programma apertura e chiusura', 'programmaVotazioni')
+      .addItem('Mostra pianificazione', 'mostraPianificazione')
+      .addItem('Annulla pianificazione', 'annullaPianificazione'))
     .addSeparator()
     .addItem('Aggiorna partecipazione', 'aggiornaPartecipazione')
     .addItem('Aggiorna report', 'aggiornaReport')
@@ -90,6 +105,30 @@ function apri3() { apriRound_(3); }
 function calcola1() { calcolaRisultati_(false); }
 function calcola2() { calcolaCarica_(2, false); }
 function calcola3() { calcolaCarica_(3, false); }
+
+/* ================= Interfaccia (anche senza interfaccia) ================= */
+
+/**
+ * Restituisce l'interfaccia del foglio quando c'è un utente davanti allo schermo.
+ * Quando il codice gira da un trigger a tempo l'interfaccia non esiste: si usa
+ * una finta UI che raccoglie i messaggi in LOG_ (finiscono nelle email di avviso)
+ * e conferma automaticamente le domande sì/no.
+ */
+function ui_() {
+  try {
+    const u = SpreadsheetApp.getUi();
+    u.ButtonSet.YES_NO;            // tocca l'oggetto: fuori dall'interfaccia solleva eccezione
+    return u;
+  } catch (e) {
+    return {
+      automatica: true,
+      Button: { YES: 'YES', NO: 'NO', OK: 'OK', CANCEL: 'CANCEL' },
+      ButtonSet: { OK: 'OK', YES_NO: 'YES_NO', OK_CANCEL: 'OK_CANCEL' },
+      alert: function (a, b) { LOG_.push(String(b === undefined || b === 'OK' || b === 'YES_NO' || b === 'OK_CANCEL' ? a : a + ': ' + b)); return 'YES'; },
+      prompt: function (a) { LOG_.push(String(a)); return { getSelectedButton: function () { return 'CANCEL'; }, getResponseText: function () { return ''; } }; }
+    };
+  }
+}
 
 /* ================= Setup e migrazioni ================= */
 
@@ -133,10 +172,19 @@ function setup() {
     ['Formatore di riferimento', '', 'Nome, senza votazione. Se vuole essere votante va inserito anche tra i Candidati come Autocandidatura'],
     ['Presidente', '', 'Compilato dal round 2; parità non risolte: scrivilo a mano'],
     ['Vice', '', 'Compilato dal round 3; parità non risolte: scrivilo a mano'],
+    ['Apertura voto commissari', '', 'Data e ora (gg/mm/aaaa hh:mm). Vuoto = apertura manuale'],
+    ['Chiusura voto commissari', '', 'Data e ora: alla chiusura calcola i risultati, prepara i commissari e apre il voto Presidente'],
+    ['Apertura voto presidente', '', 'Vuoto = subito dopo la chiusura del voto commissari'],
+    ['Chiusura voto presidente', '', 'Data e ora: alla chiusura calcola i risultati finali'],
+    ['Durata ballottaggio (ore)', 24, 'Quanto resta aperto un ballottaggio aperto in automatico dopo una parità'],
+    ['Proroga automatica (ore)', 24, 'Se alla chiusura programmata manca qualche voto, la votazione resta aperta ancora per queste ore'],
+    ['Email avvisi', '', 'Dove inviare gli avvisi delle votazioni programmate. Vuoto = indirizzo del proprietario del foglio'],
     ['Logo pagina web', LOGO_SVG, 'URL del logo sulla pagina di voto (hotlinking, SVG o PNG). Vuoto = nessun logo'],
     ['Logo fogli (PNG)', LOGO_PNG, 'URL del logo nei resoconti: i fogli Google non mostrano SVG, serve PNG/JPG. Vuoto = nessun logo']
   ].forEach(r => ensureCfgRow_(r[0], r[1], r[2]));
   cfgCell_('Anno sportivo').setNumberFormat('@');  // testo: "2026/27" non diventa una data
+  ['Apertura voto commissari', 'Chiusura voto commissari', 'Apertura voto presidente', 'Chiusura voto presidente']
+    .forEach(k => cfgCell_(k).setNumberFormat('dd/mm/yyyy hh:mm'));
 
   ensureSheet_(ss, SH.SOC, SOC_HEADER);
   ensureSheet_(ss, SH.SQ, SQ_HEADER);
@@ -151,11 +199,13 @@ function setup() {
   applicaValidazioni_();
   const props = PropertiesService.getScriptProperties();
   if (!props.getProperty(P_SALT)) props.setProperty(P_SALT, Utilities.getUuid());
-  SpreadsheetApp.getUi().alert(
+  const nuovi = assegnaCodiciMancanti_();   // codici univoci XXXX-9999 a chi non ne ha
+  if (nuovi) avvisi.push(nuovi + ' società senza codice: codice e link assegnati ora.');
+  ui_().alert(
     'Fogli pronti.\n\n1) "Società": una riga per società (una riga = un voto).\n' +
     '2) "Squadre": squadra e società di appartenenza.\n' +
     '3) "Candidati": nome, qualifica, squadra, anni.\n' +
-    '4) Round 1 → "Genera codici e link società".' + (avvisi.length ? '\n\n' + avvisi.join('\n\n') : ''));
+    '4) Round 1 → "Genera codici e link mancanti".' + (avvisi.length ? '\n\n' + avvisi.join('\n\n') : ''));
 }
 
 function ensureSheet_(ss, name, header) {
@@ -197,8 +247,12 @@ function applicaValidazioni_() {
 
 /* ================= Round 1: codici società ================= */
 
-function generaCodici() {
-  const ui = SpreadsheetApp.getUi();
+/**
+ * Assegna codice e link alle società che non li hanno ancora e aggiorna tutti
+ * i link all'URL corrente, senza toccare società, squadre, candidati, codici
+ * già assegnati né voti già espressi. Restituisce quanti codici sono nuovi.
+ */
+function assegnaCodiciMancanti_(tutti) {
   const soc = sheet_(SH.SOC);
   // aggiunge le società indicate in "Squadre" ma non ancora elencate
   const presenti = new Set(colonna_(soc, 1).map(x => x.toLowerCase()));
@@ -209,27 +263,70 @@ function generaCodici() {
     }
   });
   const n = soc.getLastRow() - 1;
-  if (n < 1) return ui.alert('Inserisci le società nel foglio "Società" (o la società di ogni squadra in "Squadre").');
+  if (n < 1) return 0;
   const rows = soc.getRange(2, 1, n, 3).getValues();
-  const usati = codiciEsistenti_();
+  const usati = tutti ? new Set() : codiciEsistenti_();
   let nuovi = 0;
   rows.forEach(r => {
-    if (!String(r[0]).trim()) { r[2] = ''; return; }
-    if (!norm_(r[1])) { r[1] = codiceNuovo_(usati); nuovi++; }
+    if (!String(r[0]).trim()) { r[1] = tutti ? '' : r[1]; r[2] = ''; return; }
+    if (tutti || !norm_(r[1])) { r[1] = codiceNuovo_(usati); nuovi++; }
     r[2] = link_(r[1]);
   });
   soc.getRange(2, 1, n, 3).setValues(rows);
   applicaValidazioni_();
-  ui.alert(nuovi + ' nuovi codici generati, link aggiornati. Società aventi diritto: ' + numSocieta_() +
-    ' → commissari da eleggere: ' + posti_(cfg_()) + '.' +
+  return nuovi;
+}
+
+/** Genera i codici mancanti e aggiorna i link, lasciando intatto tutto il resto. */
+function generaCodici() {
+  const ui = ui_();
+  if (!sheet_(SH.SOC).getLastRow() || numSocieta_() + squadre_().length === 0)
+    return ui.alert('Inserisci le società nel foglio "Società" (o la società di ogni squadra in "Squadre").');
+  const nuovi = assegnaCodiciMancanti_(false);
+  ui.alert(nuovi + ' nuovi codici generati; link aggiornati per tutte le società (codici esistenti e voti già espressi restano validi).' +
+    '\nSocietà aventi diritto: ' + numSocieta_() + ' → commissari da eleggere: ' + posti_(cfg_()) + '.' +
     (link_('X') ? '\n\nInvia a ogni società solo il SUO link.'
       : '\n\nLink non disponibili: pubblica prima l\'app web (Esegui il deployment → App web), poi rilancia questa voce.'));
 }
 
+/** Rigenera da zero i codici di tutte le società (dati e candidati restano intatti). */
+function rigeneraCodiciSocieta() {
+  const ui = ui_();
+  const c = cfg_();
+  if (aperta_(c)) return ui.alert('Chiudi prima la votazione aperta.');
+  if (usati_(1, 0).length)
+    return ui.alert('Ci sono già voti espressi nel round 1: rigenerare i codici permetterebbe di votare due volte.\n\n' +
+      'Usa "Genera codici e link mancanti" oppure azzera il round 1 prima di rigenerare.');
+  if (ui.alert('Rigenera tutti i codici', 'Tutte le società ricevono un nuovo codice e un nuovo link: quelli già inviati non funzioneranno più.\nSocietà, squadre e candidati restano invariati. Procedere?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  const n = assegnaCodiciMancanti_(true);
+  ui.alert(n + ' codici rigenerati. Invia a ogni società il suo nuovo link.');
+}
+
+/** Rigenera i codici dei commissari senza rifare l'elenco (round 2 e 3). */
+function rigeneraCodiciCommissari() {
+  const ui = ui_();
+  const c = cfg_();
+  if (aperta_(c)) return ui.alert('Chiudi prima la votazione aperta.');
+  const sh = sheet_(SH.COM);
+  const com = commissari_();
+  if (!com.length) return ui.alert('Nessun commissario: usa "Prepara commissari e link".');
+  if (usati_(2, 0).length || usati_(3, 0).length)
+    return ui.alert('Ci sono già voti espressi nei round 2 o 3: rigenerare i codici permetterebbe di votare due volte.\n\nAzzera prima quei round.');
+  if (ui.alert('Rigenera codici commissari', com.length + ' commissari riceveranno un nuovo codice e link; i link precedenti non funzioneranno più. Procedere?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  const usati = new Set(Object.keys(codiciMap_()));
+  com.forEach((x, i) => {
+    const cod = codiceNuovo_(usati);
+    sh.getRange(i + 2, 4, 1, 2).setValues([[cod, link_(cod)]]);
+  });
+  ui.alert(com.length + ' codici commissari rigenerati.');
+}
+
+/** Codice casuale nel formato XXXX-9999: 4 lettere maiuscole A–H e 4 cifre. */
 function codiceCasuale_() {
   const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, Utilities.getUuid() + Math.random());
   let s = '';
-  for (let i = 0; i < 8; i++) s += ALFABETO[(bytes[i] + 256) % ALFABETO.length];
+  for (let i = 0; i < 4; i++) s += LETTERE[(bytes[i] + 256) % LETTERE.length];
+  for (let i = 4; i < 8; i++) s += CIFRE[(bytes[i] + 256) % CIFRE.length];
   return s;
 }
 
@@ -257,7 +354,7 @@ function link_(cod) {
 /* ================= Apertura / chiusura ================= */
 
 function apriRound_(r) {
-  const ui = SpreadsheetApp.getUi();
+  const ui = ui_();
   const c = cfg_();
   if (aperta_(c)) return ui.alert('È aperta: ' + descrContesto_(c) + '. Chiudila prima.');
   const cand = candidatiRound_(r, c);
@@ -270,7 +367,7 @@ function apriRound_(r) {
     const nomi = cand.map(x => x.nome);
     const doppi = nomi.filter((x, i) => nomi.indexOf(x) !== i);
     if (doppi.length) return ui.alert('Candidati con lo stesso nome: ' + doppi.join(', ') + '. Rendili distinguibili.');
-    if (!Object.keys(codiciMap_()).length) return ui.alert('Nessun codice: usa "Round 1 → Genera codici e link società".');
+    if (!Object.keys(codiciMap_()).length) return ui.alert('Nessun codice: usa "Round 1 → Genera codici e link mancanti".');
     const senzaQ = cand.filter(x => !x.qualifica).map(x => x.nome);
     if (senzaQ.length && ui.alert('Qualifica mancante', 'Senza qualifica (trattati come allenatori): ' + senzaQ.join(', ') + '.\nAprire comunque?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
     if (cand.length < posti_(c) && ui.alert('Candidati insufficienti', 'Ci sono ' + cand.length + ' candidati per ' + posti_(c) + ' posti. Aprire comunque?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
@@ -285,7 +382,16 @@ function apriRound_(r) {
     '.\nNon modificare candidati e votanti finché è in corso.');
 }
 
+/**
+ * Chiude la votazione in corso. Vale anche per una votazione aperta a tempo:
+ * il trigger di chiusura/proroga ancora pendente viene rimosso, così la
+ * decisione resta a chi amministra l'urna.
+ */
 function chiudiVotazione() {
+  const c0 = cfg_();
+  const r = roundAttivo_(c0);
+  eliminaTrigger_(ballottaggioAttivo_(c0) ? 'triggerChiudeBallottaggio'
+    : r === 2 ? 'triggerChiudePresidente' : r === 1 ? 'triggerChiudeCommissari' : null);
   setCfg_('Stato', 'CHIUSA');
   aggiornaPartecipazione();
   aggiornaUrna();
@@ -300,19 +406,21 @@ function descrContesto_(c) {
 
 /** Crea il foglio Commissari dagli ELETTI del round 1, con codici e link per i round 2 e 3. */
 function preparaCommissari() {
-  const ui = SpreadsheetApp.getUi();
+  const ui = ui_();
   const c = cfg_();
-  if (aperta_(c)) return ui.alert('Chiudi prima la votazione aperta.');
+  if (aperta_(c)) { ui.alert('Chiudi prima la votazione aperta.'); return false; }
   const ris = sheet_(SH.RIS);
-  if (ris.getLastRow() < 2) return ui.alert('Calcola prima i risultati del round 1.');
+  if (ris.getLastRow() < 2) { ui.alert('Calcola prima i risultati del round 1.'); return false; }
   const h = ris.getRange(1, 1, 1, ris.getLastColumn()).getValues()[0].map(x => String(x).toLowerCase());
   const col = p => h.findIndex(x => x.indexOf(p) === 0);
   const iN = col('candidat'), iQ = col('qualific'), iS = col('squadr'), iE = col('esito');
   const v = ris.getRange(2, 1, ris.getLastRow() - 1, ris.getLastColumn()).getValues();
-  if (v.some(r => /^PARIT/i.test(String(r[iE]))))
-    return ui.alert('Ci sono parità da risolvere in "Risultati": usa il menu Ballottaggio oppure scrivi a mano ELETTO o Non eletto nella colonna Esito.');
+  if (v.some(r => /^PARIT/i.test(String(r[iE])))) {
+    ui.alert('Ci sono parità da risolvere in "Risultati": usa il menu Ballottaggio oppure scrivi a mano ELETTO o Non eletto nella colonna Esito.');
+    return false;
+  }
   const eletti = v.filter(r => /^ELETT/i.test(String(r[iE])) && String(r[iN]).trim());
-  if (!eletti.length) return ui.alert('Nessun eletto in "Risultati".');
+  if (!eletti.length) { ui.alert('Nessun eletto in "Risultati".'); return false; }
 
   const sh = sheet_(SH.COM);
   const vecchi = {};
@@ -331,6 +439,7 @@ function preparaCommissari() {
   ui.alert(rows.length + ' commissari pronti.' + (link_('X')
     ? '\nInvia a ciascuno il SUO link: vale sia per il Presidente sia per il Vice.'
     : '\nLink non disponibili: pubblica prima l\'app web.'));
+  return true;
 }
 
 /* ================= Partecipazione ================= */
@@ -376,7 +485,7 @@ function datiRound1_(c) {
 }
 
 function calcolaRisultati_(silenzioso) {
-  const ui = SpreadsheetApp.getUi();
+  const ui = ui_();
   const c = cfg_();
   if (aperta_(c) && roundAttivo_(c) === 1) return ui.alert('Chiudi prima la votazione in corso.');
   const d = datiRound1_(c);
@@ -508,7 +617,7 @@ function datiCarica_(r, c) {
 }
 
 function calcolaCarica_(r, silenzioso) {
-  const ui = SpreadsheetApp.getUi();
+  const ui = ui_();
   const c = cfg_();
   if (aperta_(c) && roundAttivo_(c) === r) return ui.alert('Chiudi prima la votazione in corso.');
   const d = datiCarica_(r, c);
@@ -570,7 +679,10 @@ function stessoGruppo_(a, b) {
 function applicaBallottaggio_(r, ass) {
   const st = balState_(r);
   if (!st || !ass.tie || !stessoGruppo_(st.orig, ass.tie)) return;
-  st.eletti.forEach(e => ass.esito[e.nome] = { esito: 'ELETTO', nota: 'Eletto al ballottaggio ' + e.n });
+  st.eletti.forEach(e => ass.esito[e.nome] = {
+    esito: 'ELETTO',
+    nota: e.sorteggio ? 'Eletto per sorteggio dopo ' + MAX_BALLOTTAGGI + ' ballottaggi' : 'Eletto al ballottaggio ' + e.n
+  });
   st.orig.candidati.forEach(nome => {
     if (st.eletti.some(e => e.nome === nome)) return;
     if (st.stato !== 'risolto' && st.candidati.indexOf(nome) >= 0) {
@@ -589,7 +701,7 @@ function applicaBallottaggio_(r, ass) {
 function tieCorrente_(r, c) { return r === 1 ? datiRound1_(c).ass.tie : datiCarica_(r, c).ass.tie; }
 
 function preparaBallottaggio() {
-  const ui = SpreadsheetApp.getUi();
+  const ui = ui_();
   const c = cfg_();
   if (aperta_(c)) return ui.alert('Chiudi prima la votazione aperta (' + descrContesto_(c) + ').');
   const r = roundAttivo_(c);
@@ -635,7 +747,7 @@ function preparaBallottaggio() {
 }
 
 function apriBallottaggio() {
-  const ui = SpreadsheetApp.getUi();
+  const ui = ui_();
   const c = cfg_();
   if (aperta_(c)) return ui.alert('È aperta: ' + descrContesto_(c) + '. Chiudila prima.');
   const r = roundAttivo_(c);
@@ -648,7 +760,7 @@ function apriBallottaggio() {
 }
 
 function calcolaBallottaggio() {
-  const ui = SpreadsheetApp.getUi();
+  const ui = ui_();
   const c = cfg_();
   const r = roundAttivo_(c);
   if (aperta_(c) && ballottaggioAttivo_(c)) return ui.alert('Chiudi prima il ballottaggio.');
@@ -703,16 +815,20 @@ function scriviRisultatiBallottaggi_() {
     if (!st) return;
     st.storico.forEach(b => {
       rows.push(R(''));
-      rows.push(R('Round ' + r + ' – ' + ROUND[r].nome + ' · Ballottaggio ' + b.n + ': ' + b.posti +
-        (b.posti === 1 ? ' posto' : ' posti') + ' tra ' + b.candidati.length + ' candidati'));
+      rows.push(R('Round ' + r + ' – ' + ROUND[r].nome + (b.sorteggio
+        ? ' · SORTEGGIO dopo ' + MAX_BALLOTTAGGI + ' ballottaggi: ' + b.posti + (b.posti === 1 ? ' posto' : ' posti') + ' tra ' + b.candidati.length + ' candidati'
+        : ' · Ballottaggio ' + b.n + ': ' + b.posti + (b.posti === 1 ? ' posto' : ' posti') + ' tra ' + b.candidati.length + ' candidati')));
       head.push(rows.length);
-      rows.push(R('Candidato', 'Voti', 'Esito'));
+      rows.push(R('Candidato', b.sorteggio ? 'Esito del sorteggio' : 'Voti', b.sorteggio ? '' : 'Esito'));
       const pari = b.pari || [];
-      b.candidati.forEach(n => rows.push(R(n, b.voti[n],
-        b.eletti.indexOf(n) >= 0 ? 'ELETTO' : (pari.indexOf(n) >= 0 ? 'Ancora in parità' : 'Non eletto'))));
-      rows.push(R('Schede', b.schede, 'di cui bianche: ' + b.bianche));
+      b.candidati.forEach(n => rows.push(b.sorteggio
+        ? R(n, b.eletti.indexOf(n) >= 0 ? 'ELETTO (sorteggio)' : 'Non eletto')
+        : R(n, b.voti[n], b.eletti.indexOf(n) >= 0 ? 'ELETTO' : (pari.indexOf(n) >= 0 ? 'Ancora in parità' : 'Non eletto'))));
+      if (b.sorteggio) rows.push(R('Sorteggio eseguito il', b.quando || ''));
+      else rows.push(R('Schede', b.schede, 'di cui bianche: ' + b.bianche));
     });
-    rows.push(R('Stato finale round ' + r, st.stato === 'risolto' ? 'Parità risolta'
+    rows.push(R('Stato finale round ' + r, st.sorteggiato ? 'Parità risolta per sorteggio'
+      : st.stato === 'risolto' ? 'Parità risolta'
       : st.stato === 'irrisolto' ? 'Parità non risolta dopo ' + MAX_BALLOTTAGGI + ' ballottaggi: decisione manuale'
       : 'In corso (ballottaggio ' + st.n + ')'));
   });
@@ -723,6 +839,363 @@ function scriviRisultatiBallottaggi_() {
   head.forEach(i => sh.getRange(i + o, 1, 1, W).setFontWeight('bold').setBackground(BLU));
   scriviLinkRepo_(sh, rows.length + 2 + o);
   sh.autoResizeColumns(1, W);
+}
+
+/* ================= Votazioni programmate ================= */
+
+/*
+ * Apertura e chiusura a tempo del voto commissari (round 1) e del voto per il
+ * Presidente (round 2), tramite trigger temporali.
+ *
+ * Regola di chiusura: si calcola e si prosegue SOLO se hanno votato tutti gli
+ * aventi diritto. Se manca anche un solo voto la votazione resta aperta e la
+ * chiusura è prorogata automaticamente delle ore indicate in Config, con una
+ * email che elenca chi non ha ancora votato. Le proroghe non hanno limite:
+ * in qualsiasi momento si può chiudere a mano dal menu (la chiusura manuale
+ * annulla il trigger pendente).
+ */
+
+function dataCfg_(c, key) {
+  const v = c[key];
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  const t = String(v || '').trim();
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:[ ,]+(\d{1,2})[:.](\d{2}))?$/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0));
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function dataTesto_(d) { return d ? Utilities.formatDate(d, FUSO, 'dd/MM/yyyy HH:mm') : '—'; }
+
+function oreProroga_(c) {
+  const n = Number(String(c['Proroga automatica (ore)'] || '').toString().replace(',', '.'));
+  return n > 0 ? n : 24;
+}
+
+function emailAvvisi_(c) {
+  const e = String(c['Email avvisi'] || '').trim();
+  if (e) return e;
+  try { return Session.getEffectiveUser().getEmail(); } catch (err) { return ''; }
+}
+
+/** Invia un avviso a chi amministra l'urna; i messaggi raccolti in LOG_ finiscono in coda. */
+function notifica_(oggetto, corpo) {
+  const c = cfg_();
+  const to = emailAvvisi_(c);
+  const testo = corpo + (LOG_.length ? '\n\n— Note del sistema —\n' + LOG_.join('\n') : '') +
+    '\n\n' + intestazione_(c) + '\n' + REPO_URL + ' (' + VERSIONE + ')';
+  if (!to) return;
+  try { MailApp.sendEmail(to, '[CTL Baskin] ' + oggetto, testo); } catch (e) { /* niente email: resta il foglio */ }
+}
+
+function eliminaTrigger_(fn) {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    const f = t.getHandlerFunction();
+    if (fn ? f === fn : TRIGGER_FN.indexOf(f) >= 0) ScriptApp.deleteTrigger(t);
+  });
+}
+
+function creaTrigger_(fn, data) {
+  eliminaTrigger_(fn);
+  ScriptApp.newTrigger(fn).timeBased().at(data).create();
+}
+
+/** Legge dal foglio Config le quattro date della pianificazione. */
+function pianificazione_(c) {
+  return {
+    ap1: dataCfg_(c, 'Apertura voto commissari'),
+    ch1: dataCfg_(c, 'Chiusura voto commissari'),
+    ap2: dataCfg_(c, 'Apertura voto presidente'),
+    ch2: dataCfg_(c, 'Chiusura voto presidente')
+  };
+}
+
+/** Crea i trigger a partire dalle date scritte in Config. */
+function programmaVotazioni() {
+  const ui = ui_();
+  const c = cfg_();
+  const p = pianificazione_(c);
+  const ora = new Date();
+  const min = new Date(ora.getTime() + 60000);
+  if (!p.ap1 && !p.ch1 && !p.ch2)
+    return ui.alert('Compila in Config almeno "Chiusura voto commissari" (formato gg/mm/aaaa hh:mm).');
+  if (p.ap1 && p.ch1 && p.ch1 <= p.ap1) return ui.alert('La chiusura del voto commissari deve venire dopo l\'apertura.');
+  if (p.ap2 && p.ch1 && p.ap2 < p.ch1) return ui.alert('L\'apertura del voto presidente non può precedere la chiusura del voto commissari.');
+  if (p.ch2 && (p.ap2 || p.ch1) && p.ch2 <= (p.ap2 || p.ch1)) return ui.alert('La chiusura del voto presidente deve venire dopo la sua apertura.');
+
+  eliminaTrigger_(null);
+  const righe = [];
+  if (p.ap1 && p.ap1 > min) { creaTrigger_('triggerApreCommissari', p.ap1); righe.push('Apre il voto commissari: ' + dataTesto_(p.ap1)); }
+  else if (p.ap1) righe.push('Apertura voto commissari già passata: aprilo a mano dal menu.');
+  if (p.ch1 && p.ch1 > min) { creaTrigger_('triggerChiudeCommissari', p.ch1); righe.push('Chiude il voto commissari: ' + dataTesto_(p.ch1)); }
+  else if (p.ch1) righe.push('Chiusura voto commissari già passata: non programmata.');
+  righe.push(p.ap2 ? 'Apre il voto presidente: ' + dataTesto_(p.ap2) : 'Apre il voto presidente: subito dopo la chiusura del voto commissari');
+  righe.push(p.ch2 ? 'Chiude il voto presidente: ' + dataTesto_(p.ch2) : 'Chiusura voto presidente: non programmata (manuale)');
+  righe.push('');
+  righe.push('Se alla chiusura manca qualche voto, la votazione resta aperta e la chiusura è prorogata di ' +
+    oreProroga_(c) + ' ore, con avviso a ' + (emailAvvisi_(c) || '(nessuna email impostata)') + '.');
+  righe.push('In qualsiasi momento puoi chiudere a mano dal menu: la proroga automatica si ferma.');
+  ui.alert('Votazioni programmate', righe.join('\n'), ui.ButtonSet.OK);
+}
+
+function mostraPianificazione() {
+  const ui = ui_();
+  const c = cfg_();
+  const p = pianificazione_(c);
+  const attivi = ScriptApp.getProjectTriggers()
+    .map(t => t.getHandlerFunction())
+    .filter(f => TRIGGER_FN.indexOf(f) >= 0);
+  const nomi = {
+    triggerApreCommissari: 'apertura voto commissari',
+    triggerChiudeCommissari: 'chiusura voto commissari',
+    triggerAprePresidente: 'apertura voto presidente',
+    triggerChiudePresidente: 'chiusura voto presidente'
+  };
+  ui.alert('Pianificazione',
+    'Date in Config:\n' +
+    '· apertura voto commissari: ' + dataTesto_(p.ap1) + '\n' +
+    '· chiusura voto commissari: ' + dataTesto_(p.ch1) + '\n' +
+    '· apertura voto presidente: ' + (p.ap2 ? dataTesto_(p.ap2) : 'subito dopo la chiusura del voto commissari') + '\n' +
+    '· chiusura voto presidente: ' + dataTesto_(p.ch2) + '\n' +
+    '· proroga automatica: ' + oreProroga_(c) + ' ore\n' +
+    '· avvisi a: ' + (emailAvvisi_(c) || '—') + '\n\n' +
+    (attivi.length ? 'Programmazioni attive: ' + attivi.map(f => nomi[f]).join(', ') + '.'
+      : 'Nessuna programmazione attiva: usa "Programma apertura e chiusura".'), ui.ButtonSet.OK);
+}
+
+function annullaPianificazione() {
+  const ui = ui_();
+  if (ui.alert('Annulla pianificazione', 'Le aperture e chiusure automatiche vengono rimosse. Le votazioni già aperte restano aperte. Procedere?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  eliminaTrigger_(null);
+  ui.alert('Pianificazione annullata: da qui in poi apri e chiudi dal menu.');
+}
+
+/** Elenco di chi non ha ancora votato nel round (o ballottaggio) indicato. */
+function mancanti_(r, b) {
+  const used = usati_(r, b || 0);
+  const map = votantiMap_(r, b || 0);
+  const out = [];
+  Object.keys(map).forEach(k => { if (used.indexOf(hash_(k)) < 0) out.push(map[k]); });
+  return out.sort();
+}
+
+/**
+ * Chiusura programmata di un round: chiude solo se hanno votato tutti,
+ * altrimenti proroga e avvisa. Restituisce true se il round è stato chiuso.
+ */
+function chiusuraProgrammata_(r, b, fnTrigger, chiaveCfg) {
+  const c = cfg_();
+  const mancano = mancanti_(r, b);
+  if (!mancano.length) { chiudiVotazione(); return true; }
+  const ore = oreProroga_(c);
+  const nuova = new Date(new Date().getTime() + ore * 3600000);
+  if (chiaveCfg) setCfg_(chiaveCfg, nuova);
+  creaTrigger_(fnTrigger, nuova);
+  notifica_('Mancano voti: chiusura prorogata',
+    'La votazione "' + ROUND[r].nome + (b ? ' — ballottaggio ' + b : '') + '" doveva chiudersi ora, ma non hanno ancora votato tutti.\n\n' +
+    'Non hanno votato (' + mancano.length + '):\n· ' + mancano.join('\n· ') + '\n\n' +
+    'La votazione resta APERTA e la chiusura è prorogata di ' + ore + ' ore, al ' + dataTesto_(nuova) + '.\n' +
+    'Sollecita chi manca, oppure chiudi a mano dal menu (Votazione → Chiudi): la proroga si ferma e decidi tu come procedere.');
+  return false;
+}
+
+function triggerApreCommissari() {
+  LOG_.length = 0;
+  const c = cfg_();
+  if (aperta_(c)) return;
+  apriRound_(1);
+  const ok = aperta_(cfg_());
+  notifica_(ok ? 'Voto commissari aperto' : 'Voto commissari NON aperto',
+    ok ? 'Il voto per i commissari è aperto: le società possono votare con il link ricevuto.' +
+         (pianificazione_(cfg_()).ch1 ? '\nChiusura prevista: ' + dataTesto_(pianificazione_(cfg_()).ch1) + '.' : '')
+       : 'Non è stato possibile aprire il voto per i commissari. Controlla il foglio e apri a mano dal menu.');
+}
+
+function triggerChiudeCommissari() {
+  LOG_.length = 0;
+  const c = cfg_();
+  if (!aperta_(c) || roundAttivo_(c) !== 1 || ballottaggioAttivo_(c)) return;  // già chiusa a mano o ballottaggio in corso
+  if (!chiusuraProgrammata_(1, 0, 'triggerChiudeCommissari', 'Chiusura voto commissari')) return;
+
+  calcolaRisultati_(true);
+  if (datiRound1_(cfg_()).ass.tie) return avviaBallottaggio_(1);
+  proseguiDopoRound1_();
+}
+
+/** Round 1 concluso senza parità: commissari pronti e voto per il Presidente. */
+function proseguiDopoRound1_() {
+  if (!preparaCommissari()) {
+    notifica_('Voto commissari chiuso: controlla i risultati',
+      'Il voto è chiuso e i risultati sono calcolati, ma non è stato possibile preparare i commissari. ' +
+      'Controlla il foglio "Risultati" e prosegui dal menu.');
+    return;
+  }
+  const p = pianificazione_(cfg_());
+  const elenco = commissari_().map(x => '· ' + x.nome + ' — codice ' + x.codice + (link_(x.codice) ? ' — ' + link_(x.codice) : ' — link non disponibile (pubblica l\'app web)')).join('\n');
+  if (p.ap2 && p.ap2 > new Date(new Date().getTime() + 60000)) {
+    creaTrigger_('triggerAprePresidente', p.ap2);
+    notifica_('Commissari eletti: voto Presidente il ' + dataTesto_(p.ap2),
+      'Hanno votato tutte le società. I commissari eletti sono:\n' + elenco +
+      '\n\nIl voto per il Presidente si aprirà il ' + dataTesto_(p.ap2) +
+      (p.ch2 ? ' e si chiuderà il ' + dataTesto_(p.ch2) : '') + '.\nInvia a ogni commissario il suo link.');
+    return;
+  }
+  apriRound_(2);
+  if (p.ch2 && p.ch2 > new Date(new Date().getTime() + 60000)) creaTrigger_('triggerChiudePresidente', p.ch2);
+  notifica_('Commissari eletti: voto Presidente aperto',
+    'Hanno votato tutte le società. I commissari eletti sono:\n' + elenco +
+    '\n\nIl voto per il Presidente è aperto' + (p.ch2 ? ' e si chiuderà il ' + dataTesto_(p.ch2) : '') +
+    '.\nInvia a ogni commissario il suo link: vale anche per il voto del Vice.');
+}
+
+function triggerAprePresidente() {
+  LOG_.length = 0;
+  const c = cfg_();
+  if (aperta_(c)) return;
+  apriRound_(2);
+  const p = pianificazione_(cfg_());
+  if (p.ch2 && p.ch2 > new Date(new Date().getTime() + 60000)) creaTrigger_('triggerChiudePresidente', p.ch2);
+  const elenco = commissari_().map(x => '· ' + x.nome + ' — codice ' + x.codice + (link_(x.codice) ? ' — ' + link_(x.codice) : ' — link non disponibile (pubblica l\'app web)')).join('\n');
+  notifica_(aperta_(cfg_()) ? 'Voto Presidente aperto' : 'Voto Presidente NON aperto',
+    (aperta_(cfg_()) ? 'Il voto per il Presidente è aperto' + (p.ch2 ? ', chiusura prevista il ' + dataTesto_(p.ch2) : '') + '.\n\n'
+      : 'Non è stato possibile aprire il voto per il Presidente: apri a mano dal menu.\n\n') + elenco);
+}
+
+function triggerChiudePresidente() {
+  LOG_.length = 0;
+  const c = cfg_();
+  if (!aperta_(c) || roundAttivo_(c) !== 2 || ballottaggioAttivo_(c)) return;
+  if (!chiusuraProgrammata_(2, 0, 'triggerChiudePresidente', 'Chiusura voto presidente')) return;
+
+  calcolaCarica_(2, true);
+  if (datiCarica_(2, cfg_()).ass.tie) return avviaBallottaggio_(2);
+  concludiPresidente_();
+}
+
+/** Voto per il Presidente concluso: risultati finali per email. */
+function concludiPresidente_() {
+  const d = datiCarica_(2, cfg_());
+  const righe = commissari_().map(x => '· ' + x.nome + (x.squadra ? ' (' + x.squadra + ')' : ''));
+  notifica_('Risultati finali: Presidente eletto',
+    'Hanno votato tutti i commissari. Risultati finali:\n\n' +
+    'Presidente della CTL: ' + (d.vincitore || '— nessun voto espresso —') + '\n\n' +
+    'Commissari:\n' + righe.join('\n') +
+    '\n\nResta da eleggere il Vice (round 3), da aprire dal menu: i commissari usano lo stesso link.');
+}
+
+/**
+ * Risolve per sorteggio la parità rimasta dopo il massimo dei ballottaggi.
+ * L'estrazione è registrata nel foglio "Risultati ballottaggi" e nei risultati
+ * del round (nota "Eletto per sorteggio"). Restituisce i nomi estratti.
+ */
+function sorteggio_(r) {
+  const st = balState_(r);
+  if (!st || st.stato !== 'irrisolto' || !st.candidati.length) return null;
+  const urna = st.candidati.slice();
+  const estratti = [];
+  for (let i = 0; i < st.posti && urna.length; i++) {
+    const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, Utilities.getUuid() + Math.random());
+    estratti.push(urna.splice(((bytes[0] + 256) % 256) % urna.length, 1)[0]);
+  }
+  const quando = Utilities.formatDate(new Date(), FUSO, 'dd/MM/yyyy HH:mm');
+  st.storico.push({ n: st.n, sorteggio: true, quando: quando, candidati: st.candidati.slice(),
+    posti: st.posti, voti: {}, schede: 0, bianche: 0, eletti: estratti.slice(), pari: [] });
+  estratti.forEach(n => st.eletti.push({ nome: n, n: st.n, sorteggio: true }));
+  st.candidati = [];
+  st.posti = 0;
+  st.stato = 'risolto';
+  st.sorteggiato = true;
+  setBalState_(r, st);
+  scriviRisultatiBallottaggi_();
+  if (r === 1) calcolaRisultati_(true); else calcolaCarica_(r, true);
+  return { estratti: estratti, quando: quando, esclusi: urna };
+}
+
+/** Voce di menu: sorteggio della parità residua, con conferma. */
+function sorteggiaParita() {
+  const ui = ui_();
+  const c = cfg_();
+  const r = roundAttivo_(c);
+  const st = balState_(r);
+  if (!st || st.stato !== 'irrisolto')
+    return ui.alert('Nessuna parità da sorteggiare: il sorteggio si usa solo dopo ' + MAX_BALLOTTAGGI + ' ballottaggi senza esito.');
+  if (ui.alert('Sorteggio', 'Estrarre a sorte ' + st.posti + (st.posti === 1 ? ' nome' : ' nomi') + ' fra ' +
+      st.candidati.join(', ') + '? L\'esito è definitivo e viene registrato nei risultati.', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  const s = sorteggio_(r);
+  ui.alert(s ? 'Sorteggio del ' + s.quando + ': estratti ' + s.estratti.join(', ') + '.' : 'Sorteggio non eseguito.');
+}
+
+/** Ore di durata di un ballottaggio aperto in automatico. */
+function oreBallottaggio_(c) {
+  const n = Number(String(c['Durata ballottaggio (ore)'] || '').toString().replace(',', '.'));
+  return n > 0 ? n : 24;
+}
+
+/**
+ * Parità con tutti i voti espressi: prepara e apre da solo il ballottaggio
+ * successivo, con nuovi link per tutti i votanti, e ne programma la chiusura.
+ */
+function avviaBallottaggio_(r) {
+  const prima = balState_(r);
+  preparaBallottaggio();
+  const st = balState_(r);
+  if (!st || st.stato === 'irrisolto' || (prima && st.n === (prima.n || 0) && prima.stato === 'irrisolto'))
+    return sorteggiaEProsegui_(r);
+  apriBallottaggio();
+  const c = cfg_();
+  if (!aperta_(c) || !ballottaggioAttivo_(c)) {
+    notifica_('Ballottaggio non aperto',
+      'C\'è una parità nel round ' + r + ' – ' + ROUND[r].nome + ' ma non è stato possibile aprire il ballottaggio in automatico: controlla il foglio e procedi dal menu Ballottaggio.');
+    return;
+  }
+  const ore = oreBallottaggio_(c);
+  const fine = new Date(new Date().getTime() + ore * 3600000);
+  creaTrigger_('triggerChiudeBallottaggio', fine);
+  const sh = sheet_(SH.BAL);
+  const elenco = sh.getLastRow() > 1
+    ? sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues().filter(x => x[0] && x[1])
+        .map(x => '· ' + x[0] + ' — codice ' + x[1] + (x[2] ? ' — ' + x[2] : ' — link non disponibile')).join('\n')
+    : '';
+  notifica_('Parità: ballottaggio ' + st.n + ' aperto',
+    'Hanno votato tutti, ma nel round ' + r + ' – ' + ROUND[r].nome + ' c\'è una parità: ' + st.posti +
+    (st.posti === 1 ? ' posto' : ' posti') + ' tra ' + st.candidati.join(', ') + '.\n\n' +
+    'Il ballottaggio ' + st.n + ' di ' + MAX_BALLOTTAGGI + ' è stato aperto in automatico e si chiude il ' + dataTesto_(fine) +
+    ' (durata in Config → "Durata ballottaggio (ore)").\n' +
+    'ATTENZIONE: i link precedenti non valgono, invia a ogni votante il SUO nuovo link:\n' + elenco);
+}
+
+/** Dopo il massimo dei ballottaggi la parità si risolve a sorte e la catena prosegue. */
+function sorteggiaEProsegui_(r) {
+  const s = sorteggio_(r);
+  if (!s) {
+    notifica_('Parità da risolvere a mano',
+      'La parità del round ' + r + ' – ' + ROUND[r].nome + ' non è stata risolta e il sorteggio automatico non è riuscito: ' +
+      (r === 1 ? 'scrivi l\'esito nella colonna Esito del foglio "Risultati".' : 'scrivi il nome in Config → ' + ROUND[r].cfg + '.'));
+    return;
+  }
+  notifica_('Parità risolta per sorteggio',
+    'Dopo ' + MAX_BALLOTTAGGI + ' ballottaggi la parità del round ' + r + ' – ' + ROUND[r].nome + ' è stata risolta per sorteggio (' + s.quando + ').\n\n' +
+    'Estratti: ' + s.estratti.join(', ') + (s.esclusi.length ? '\nNon estratti: ' + s.esclusi.join(', ') : '') +
+    '\n\nIl sorteggio è registrato nel foglio "Risultati ballottaggi" e nei risultati del round.');
+  if (r === 1) proseguiDopoRound1_(); else concludiPresidente_();
+}
+
+function triggerChiudeBallottaggio() {
+  LOG_.length = 0;
+  const c = cfg_();
+  const r = roundAttivo_(c), b = ballottaggioAttivo_(c);
+  if (!aperta_(c) || !b) return;                       // già chiuso a mano
+  if (!chiusuraProgrammata_(r, b, 'triggerChiudeBallottaggio', null)) return;
+
+  calcolaBallottaggio();
+  const st = balState_(r);
+  if (st && st.stato === 'calcolato') return avviaBallottaggio_(r);   // parità residua: ballottaggio successivo
+  if (!st || st.stato === 'irrisolto') return sorteggiaEProsegui_(r);
+  notifica_('Ballottaggio ' + st.n + ' concluso',
+    'Il ballottaggio ' + st.n + ' del round ' + r + ' – ' + ROUND[r].nome + ' ha risolto la parità: eletti ' +
+    st.eletti.map(x => x.nome).join(', ') + '.');
+  if (r === 1) proseguiDopoRound1_(); else concludiPresidente_();
 }
 
 /* ================= Report ================= */
@@ -871,7 +1344,7 @@ function aggiornaUrna() {
 /* ================= Azzeramento ================= */
 
 function azzeraRound() {
-  const ui = SpreadsheetApp.getUi();
+  const ui = ui_();
   const p = ui.prompt('Azzera round', 'Quale round azzerare (compresi i suoi ballottaggi)? Scrivi 1, 2, 3 oppure TUTTI.\nLe schede cancellate non si recuperano.', ui.ButtonSet.OK_CANCEL);
   if (p.getSelectedButton() !== ui.Button.OK) return;
   const t = p.getResponseText().trim().toUpperCase();
@@ -965,9 +1438,24 @@ function getInfo() {
       squadra: k.squadra + (soc[k.squadra] && soc[k.squadra] !== k.squadra ? ' (' + soc[k.squadra] + ')' : '')
     })),
     max: x.max,
+    programma: testoProgramma_(c),
     eletti: x.r === 1 && !x.b ? posti_(c) : 0,
     maxAiuti: x.r === 1 && !x.b ? maxAiuti_(c) : 0
   };
+}
+
+/** Frase da mostrare ai votanti quando apertura o chiusura sono programmate. */
+function testoProgramma_(c) {
+  const p = pianificazione_(c);
+  const r = roundAttivo_(c), ora = new Date();
+  if (aperta_(c)) {
+    const fine = r === 1 ? p.ch1 : r === 2 ? p.ch2 : null;
+    return fine && fine > ora ? 'La votazione si chiude il ' + dataTesto_(fine) + '.' : '';
+  }
+  const inizio = r === 2 ? (p.ap2 || null) : p.ap1;
+  if (inizio && inizio > ora) return 'La votazione apre il ' + dataTesto_(inizio) + '.';
+  if (r === 1 && p.ch1 && p.ch1 > ora) return 'La votazione apre a breve e si chiude il ' + dataTesto_(p.ch1) + '.';
+  return '';
 }
 
 function verificaCodice(codice) {

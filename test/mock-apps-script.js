@@ -43,14 +43,17 @@ const SS = {
 const alerts = [];
 const UI = {
   alert(a, b) { const t = b || a; alerts.push(t); if (global.VERBOSE) console.log('  [avviso]', t.replace(/\n+/g, ' | ')); return 'YES'; },
-  Button: { YES: 'YES', OK: 'OK' }, ButtonSet: {},
+  Button: { YES: 'YES', NO: 'NO', OK: 'OK', CANCEL: 'CANCEL' },
+  ButtonSet: { OK: 'OK', YES_NO: 'YES_NO', OK_CANCEL: 'OK_CANCEL' },
   promptAnswer: '1',
   prompt() { return { getSelectedButton: () => 'OK', getResponseText: () => UI.promptAnswer }; },
   createMenu() { const m = { addItem: () => m, addSubMenu: () => m, addSeparator: () => m, addToUi: () => m }; return m; }
 };
 const props = {};
 global.SpreadsheetApp = {
-  getActive: () => SS, getActiveSpreadsheet: () => SS, getUi: () => UI,
+  getActive: () => SS, getActiveSpreadsheet: () => SS,
+  // con global.SENZA_UI si simula l'esecuzione da trigger a tempo (nessuna interfaccia)
+  getUi: () => { if (global.SENZA_UI) throw new Error('Cannot call SpreadsheetApp.getUi() from this context.'); return UI; },
   newDataValidation() { const b = { requireValueInList: () => b, requireValueInRange: () => b, setAllowInvalid: () => b, build: () => ({}) }; return b; },
   newRichTextValue() { const o = {}; const b = { setText(t) { o.text = t; return b; }, setLinkUrl() { return b; }, build: () => o }; return b; }
 };
@@ -62,10 +65,29 @@ global.Utilities = {
   computeDigest: (a, s) => Array.from(crypto.createHash('sha256').update(String(s)).digest()).map(b => b > 127 ? b - 256 : b),
   DigestAlgorithm: { SHA_256: 1 }, Charset: { UTF_8: 1 },
   base64Encode: a => Buffer.from(a.map(b => b & 255)).toString('base64'),
-  formatDate: () => '(data)'
+  formatDate: (d, tz, f) => {
+    const p = n => String(n).padStart(2, '0');
+    return f.replace('dd', p(d.getDate())).replace('MM', p(d.getMonth() + 1))
+      .replace('yyyy', d.getFullYear()).replace('HH', p(d.getHours())).replace('mm', p(d.getMinutes()));
+  }
 };
 global.LockService = { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) };
-global.ScriptApp = { getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ESEMPIO/exec' }) };
+// --- trigger temporali ---
+const triggers = [];   // { fn, at }
+global.ScriptApp = {
+  getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ESEMPIO/exec' }),
+  getProjectTriggers: () => triggers.map(t => ({ getHandlerFunction: () => t.fn, _t: t })),
+  deleteTrigger: h => { const i = triggers.indexOf(h._t); if (i >= 0) triggers.splice(i, 1); },
+  newTrigger(fn) {
+    const b = { timeBased: () => b, at(d) { b.when = d; return b; }, create() { triggers.push({ fn: fn, at: b.when }); } };
+    return b;
+  }
+};
 global.HtmlService = {};
 
-module.exports = { SS, UI, alerts, props };
+// --- email di avviso ---
+const email = [];
+global.MailApp = { sendEmail: (to, subject, body) => { email.push({ to, subject, body }); if (global.VERBOSE) console.log('  [email → ' + to + '] ' + subject); } };
+global.Session = { getEffectiveUser: () => ({ getEmail: () => 'custode@example.org' }) };
+
+module.exports = { SS, UI, alerts, props, triggers, email };

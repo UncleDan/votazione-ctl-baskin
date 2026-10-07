@@ -44,14 +44,15 @@
 
     <section id="s-load"><p>Caricamento…</p></section>
 
-    <section id="s-closed" hidden><p>La votazione al momento non è aperta.</p></section>
+    <section id="s-closed" hidden><p>La votazione al momento non è aperta.</p><p class="note" id="prog-closed" hidden></p></section>
 
     <section id="s-code" hidden>
       <label class="f" for="codice">Codice personale</label>
       <input type="text" id="codice" autocomplete="off" autocapitalize="characters" spellcheck="false"
-             placeholder="XXXX-XXXX" value="<?= codice ?>">
+             placeholder="ABCD-1234" value="<?= codice ?>">
       <button id="b-verifica">Continua</button>
       <div class="msg" id="m-code"></div>
+      <p class="note" id="prog-open" hidden></p>
       <p class="note">Il codice serve solo a garantire un voto per società: la scheda viene registrata senza codice, senza nome del votante e senza orario.</p>
     </section>
 
@@ -104,6 +105,12 @@
       $('titolo').textContent = i.titolo;
       $('sub').textContent = i.sottotitolo;
       if (i.intestazione) { $('sezione').textContent = i.intestazione; $('sezione').hidden = false; }
+      if (i.programma) {
+        $('prog-closed').textContent = i.programma;
+        $('prog-closed').hidden = false;
+        $('prog-open').textContent = i.programma;
+        $('prog-open').hidden = false;
+      }
       if (!i.aperta) return show('s-closed');
       show('s-code');
       if ($('codice').value.trim()) verifica();
