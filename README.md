@@ -9,6 +9,8 @@ Funziona con un Foglio Google e Google Apps Script: nessun server da gestire, ne
 - **Round 1 – Commissari CTL**: ogni società vota con un codice o link personale, fino a metà dei candidati (arrotondata per eccesso). Numero di commissari = metà delle società, per eccesso, minimo 3 e massimo 6. Le squadre sono abbinate alla loro società. Qualifiche dei candidati (Allenatore, Aiuto allenatore, Autocandidatura) con deroga configurabile: gli aiuti allenatore entrano solo se mancano allenatori e autocandidature (max 1). Spareggio per anni di tesseramento/incarichi.
 - **Round 2 – Presidente** e **Round 3 – Vice**: i commissari eletti votano con un link personale, a maggioranza semplice.
 - **Ballottaggi**: parità non risolvibili con gli anni (pari preferenze e pari anni) sui posti in palio si risolvono con fino a 3 ballottaggi a voto multiplo tra i soli candidati a pari merito, ciascuno con nuovi link.
+- **Votazioni programmate**: il voto commissari e quello per il Presidente possono aprirsi e chiudersi a tempo. Alla chiusura, se hanno votato tutti, i risultati vengono calcolati, i commissari eletti ricevono codice e link e si apre il voto per il Presidente; alla sua chiusura arrivano i risultati finali. Se manca anche un solo voto la votazione resta aperta e la chiusura è prorogata (ore configurabili, di base 24), con email che elenca chi non ha votato. La chiusura manuale è sempre possibile e ferma la proroga.
+- **Codici** nel formato `XXXX-9999` (quattro lettere A–H e quattro cifre), generabili e rigenerabili senza azzerare società, squadre, candidati o voti già espressi.
 - **Formatore di riferimento** indicato senza votazione (votante solo se candidato come Autocandidatura).
 - **Report** finale e **Riepilogo urna** per il custode, con controllo di coerenza e schede anonime per il riconteggio.
 - **Sezione Territoriale** e **anno sportivo** sulla pagina di voto e nei report.
@@ -26,7 +28,7 @@ Le schede sono salvate senza codice, votante né orario, in posizione casuale, f
 | `Index.html` | pagina di voto (da chiamare `Index` nell'editor Apps Script) |
 | `ISTRUZIONI.md` | installazione e uso passo per passo |
 | `CHANGELOG.md` | storico delle versioni |
-| `test/` | mock di Apps Script e simulazione completa (`node test/simulazione.js`) |
+| `test/` | mock di Apps Script e simulazioni (`node test/simulazione.js`, `node test/simulazione-programmata.js`) |
 | `LICENSE` | licenza MIT (codice) |
 | `NOTICE` | avvisi di copyright e proprietà del logo EISI |
 

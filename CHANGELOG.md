@@ -1,5 +1,13 @@
 # Changelog
 
+## v9
+- Codici di voto nel formato **XXXX-9999** (quattro lettere maiuscole A–H e quattro cifre), assegnati anche dall'inizializzazione.
+- **Genera codici e link mancanti**: assegna il codice solo a chi non ce l'ha e aggiorna i link, senza azzerare società, squadre, candidati o voti già espressi. Nuove voci **Rigenera TUTTI i codici e link società** e **Rigenera codici e link commissari**, rifiutate se ci sono già voti nel round interessato.
+- **Votazioni programmate**: apertura e chiusura a tempo del voto commissari e del voto per il Presidente (nuovi parametri in Config e sottomenu dedicato). Alla chiusura del round 1 i risultati vengono calcolati, i commissari eletti ricevono codice e link e si apre il voto per il Presidente; alla sua chiusura si calcolano i risultati finali. Avvisi per email a ogni passaggio.
+- **Proroga automatica**: se alla chiusura programmata manca anche un solo voto, la votazione resta aperta, la chiusura slitta delle ore indicate in Config (24 di base, proroghe illimitate) e arriva una email con l'elenco di chi non ha ancora votato.
+- La **chiusura manuale** vale anche per le votazioni a tempo: annulla il trigger pendente e ferma la proroga.
+- La pagina di voto indica quando la votazione apre o si chiude. Seconda simulazione `test/simulazione-programmata.js`.
+
 ## v8
 - Logo EISI in hotlinking dal sito eisi.it: SVG sulla pagina di voto, PNG nei resoconti (in testa a Report, Riepilogo urna e Risultati ballottaggi, nel piede dei fogli tabellari). URL configurabili in Config.
 - File NOTICE e nota nei resoconti e sulla pagina: il logo è di proprietà di Ente Italiano Sport Inclusivi e non è coperto dalla licenza MIT.
