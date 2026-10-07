@@ -79,16 +79,17 @@ Il voto commissari e il voto per il Presidente possono aprirsi e chiudersi da so
    - **Chiusura voto commissari**;
    - **Apertura voto presidente** (vuoto = subito dopo la chiusura del voto commissari);
    - **Chiusura voto presidente**;
+   - **Durata ballottaggio (ore)**: quanto resta aperto un ballottaggio aperto in automatico (predefinita 24);
    - **Proroga automatica (ore)**: predefinita 24;
    - **Email avvisi**: dove arrivano gli avvisi (vuoto = indirizzo di chi possiede il foglio).
 2. **Votazioni programmate → Programma apertura e chiusura** (la prima volta autorizza i trigger). *Mostra pianificazione* riepiloga date e automatismi attivi, *Annulla pianificazione* li rimuove.
 
 Cosa succede alla chiusura programmata:
 
-- **Se hanno votato tutti**: la votazione si chiude, i risultati vengono calcolati e, per il round 1, i commissari eletti ricevono codice e link e si apre il voto per il Presidente (subito o alla data indicata). Alla chiusura del voto Presidente vengono calcolati i risultati finali. Ogni passaggio è notificato per email, con l'elenco dei link dei commissari da inoltrare.
+- **Se hanno votato tutti**: la votazione si chiude, i risultati vengono calcolati e, per il round 1, i commissari eletti ricevono codice e link e si apre il voto per il Presidente (subito o alla data indicata). Alla chiusura del voto Presidente vengono calcolati i risultati finali. Ogni passaggio è notificato per email, con codici e link da inoltrare.
+- **Se c'è una parità** (e hanno votato tutti): il **ballottaggio viene preparato e aperto in automatico** fra i soli candidati a pari merito, con nuovi codici e link per tutti i votanti inviati nell'email, e con chiusura programmata dopo le ore indicate in Config. Alla chiusura vale la stessa regola: se manca qualcuno si proroga, se hanno votato tutti si calcola e, se la parità resta, parte da solo il ballottaggio successivo (massimo 3). Risolta la parità la catena riprende: commissari pronti e voto per il Presidente aperto, oppure risultati finali. Dopo il terzo ballottaggio senza esito arriva l'avviso di risolvere a mano (es. sorteggio).
 - **Se manca anche un solo voto**: non si calcola e non si prosegue. La votazione **resta aperta** e la chiusura è **prorogata** delle ore indicate in Config, con una email che elenca chi non ha ancora votato. Le proroghe non hanno limite.
 - **In qualsiasi momento puoi chiudere a mano** dal menu: la chiusura manuale annulla la proroga automatica e la decisione su come proseguire resta a te.
-- Se alla chiusura del round 1 c'è una **parità**, il voto per il Presidente non viene aperto: arriva un avviso e la parità si risolve con il menu Ballottaggio (i ballottaggi sono sempre manuali).
 
 Mentre la pianificazione è attiva, la pagina di voto indica quando la votazione apre o si chiude.
 
@@ -115,7 +116,8 @@ Mentre la pianificazione è attiva, la pagina di voto indica quando la votazione
 La cartella `test/` contiene due simulazioni eseguibili con Node.js:
 
 - `node test/simulazione.js`: 11 società e 16 squadre, parità al round 1 risolta con due ballottaggi, parità sul Presidente risolta con un ballottaggio, parità irrisolta dopo 3 ballottaggi;
-- `node test/simulazione-programmata.js`: generazione e rigenerazione dei codici, apertura e chiusura a tempo, proroga automatica con elenco dei mancanti, catena commissari → Presidente, chiusura manuale che ferma la proroga.
+- `node test/simulazione-programmata.js`: generazione e rigenerazione dei codici, apertura e chiusura a tempo, proroga automatica con elenco dei mancanti, catena commissari → Presidente, chiusura manuale che ferma la proroga;
+- `node test/simulazione-ballottaggio-automatico.js`: parità alla chiusura programmata, ballottaggio preparato e aperto da solo con nuovi link, proroga del ballottaggio, parità risolta e catena che riprende da sola.
 
 ## Altre voci del menu
 
