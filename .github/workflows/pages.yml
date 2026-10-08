@@ -50,14 +50,13 @@ jobs:
           print("Ponte inserito:", sys.argv[1])
           PY
 
-      # enablement: true accende Pages da sola al primo giro, se non e gia attivo
-      # (serve il permesso pages: write, dichiarato sopra). Senza, il primo run
-      # fallisce con "Get Pages site failed" finche' non lo si attiva a mano in
-      # Settings -> Pages -> Source: GitHub Actions.
+      # Pages va acceso UNA VOLTA a mano, in Settings -> Pages -> Source: GitHub
+      # Actions. Non si puo' automatizzare: creare il sito Pages dall'API richiede
+      # diritti di amministrazione che il GITHUB_TOKEN del workflow non ha, e con
+      # "enablement: true" il passo fallisce con "Resource not accessible by
+      # integration". Se invece l'errore e' "Get Pages site failed - Not Found",
+      # vuol dire che Pages non e' ancora acceso.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
 
       # Va in rete solo questa cartella: il resto del repository (Code.gs,
       # documentazione, test) resta nel repo ma non viene pubblicato.

@@ -1,5 +1,9 @@
 # Changelog
 
+## v20
+- Tolto `enablement: true` da `configure-pages`, introdotto nella v19: non funziona. Creare il sito Pages dall'API richiede diritti di amministrazione che il `GITHUB_TOKEN` del workflow non ha, e il passo fallisce con *Resource not accessible by integration*. **Pages va acceso una volta a mano**, in *Settings → Pages → Source: GitHub Actions*; è l'unico passaggio della pubblicazione che non si può automatizzare. Il motivo è scritto nel workflow, accanto al passo.
+- Nelle istruzioni, i due errori del primo giro e cosa significano: *Get Pages site failed — Not Found* (Pages non ancora acceso) e *Resource not accessible by integration* (permessi del workflow in sola lettura, da mettere su *Read and write* in Settings → Actions → General).
+
 ## v19
 - La GitHub Action attiva GitHub Pages da sola al primo giro (`enablement: true`). Prima, su un repository dove Pages non era ancora acceso, il workflow si fermava con *Get Pages site failed — Not Found*: ora lo accende e prosegue, e resta comunque possibile farlo a mano da *Settings → Pages → Source: GitHub Actions*.
 
