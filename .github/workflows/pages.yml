@@ -35,8 +35,10 @@ jobs:
           PONTE_URL: ${{ vars.PONTE }}
         run: |
           if [ -z "$PONTE_URL" ]; then
-            echo "::error::Manca la variabile PONTE del repository: l'URL /exec della web app Apps Script."
-            exit 1
+            echo "::warning::Manca la variabile PONTE del repository (l'URL /exec della web app Apps Script)."
+            echo "::warning::La pagina viene pubblicata lo stesso, ma finche' la variabile non c'e' non si puo' votare:"
+            echo "::warning::impostala in Settings -> Secrets and variables -> Actions -> Variables, poi rilancia il workflow."
+            exit 0
           fi
           python3 - "$PONTE_URL" <<'PY'
           import sys, pathlib

@@ -1,5 +1,8 @@
 # Changelog
 
+## v18
+- La GitHub Action non si ferma più se manca la variabile `PONTE`: pubblica lo stesso e lascia un avviso. Così si vede subito la pagina e si imposta l'indirizzo del ponte dopo, senza il giro vizioso "non pubblico finché non ho l'URL, non ho l'URL finché non pubblico". Finché la variabile manca, la pagina si apre ma rifiuta di votare, dicendo che l'indirizzo non è configurato.
+
 ## v17
 - Nuova colonna **Nome breve** nel foglio "Società", in coda alle altre. La prima colonna continua a portare la ragione sociale esatta, che serve per gli atti; il nome breve è quello con cui la società si chiama davvero, ed è quello che vedono i votanti e che compare **nei messaggi, nella pagina di voto, nel Riepilogo urna, nel Report e nei ballottaggi**.
 - All'inizializzazione il nome breve parte uguale alla ragione sociale, così niente cambia finché non lo accorci tu; dove è vuoto il programma usa comunque la ragione sociale.
