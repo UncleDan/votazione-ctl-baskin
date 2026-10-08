@@ -1,4 +1,4 @@
-# Votazione CTL Baskin — istruzioni (v19)
+# Votazione CTL Baskin — istruzioni (v20)
 
 Voto online anonimo, utilizzabile da telefono senza account Google:
 
@@ -26,10 +26,13 @@ Il controllo non è solo un'indicazione a schermo: una scheda che arriva dall'in
 
 ### Per attivare l'interfaccia HTML
 
-1. Nel repository GitHub: **Settings → Pages → Source: GitHub Actions**. Dalla v19 il workflow prova ad attivarlo da solo al primo giro, ma se il repository è appena nato conviene controllare che la voce sia impostata.
+1. Nel repository GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**. Questo passaggio va fatto a mano una volta sola e non si può automatizzare: accendere Pages dall'API richiede diritti di amministrazione che il token del workflow non ha.
+   Controlla anche **Settings → Actions → General → Workflow permissions**: dev'essere *Read and write permissions*, altrimenti al workflow viene negato il permesso di pubblicare.
 2. **Settings → Secrets and variables → Actions → Variables → New variable**: nome `PONTE`, valore l'indirizzo `/exec` della tua web app Apps Script (lo stesso che usi per votare dalla app). Dev'essere una **Variable**, non un **Secret**: i secret non sono leggibili come `vars.PONTE` e la pagina resterebbe senza indirizzo. Se la variabile manca il workflow pubblica lo stesso, con un avviso, e la pagina si apre ma rifiuta di votare.
 3. Fai un push (o lancia il workflow a mano): la Action pubblica solo la cartella `scheda-html/` e ci inserisce l'indirizzo del ponte.
 4. Nel foglio: **Interfaccia di voto → Usa la pagina web (HTML)…** e incolla l'indirizzo della pagina pubblicata.
+**I due errori del primo giro, e cosa vogliono dire.** *Get Pages site failed — Not Found*: Pages non è ancora acceso, fai il punto 1. *Resource not accessible by integration*: al workflow mancano i permessi, controlla che *Workflow permissions* sia su *Read and write*.
+
 5. Provala tu con un codice vero prima di mandare i link. Se qualcosa non va, torna a **Usa la app Google (semplice)**: nessuno se ne accorge.
 
 Il ponte è lo stesso script: le due pagine usano le stesse funzioni, quindi la stessa urna, gli stessi controlli e lo stesso formato della scheda. Con l'interfaccia HTML il codice viaggia dopo il cancelletto (`#c=…`): i browser non inviano quella parte al server, quindi il codice non finisce nei log.
