@@ -1,4 +1,4 @@
-# Votazione CTL Baskin — istruzioni (v18)
+# Votazione CTL Baskin — istruzioni (v19)
 
 Voto online anonimo, utilizzabile da telefono senza account Google:
 
@@ -26,7 +26,7 @@ Il controllo non è solo un'indicazione a schermo: una scheda che arriva dall'in
 
 ### Per attivare l'interfaccia HTML
 
-1. Nel repository GitHub: **Settings → Pages → Source: GitHub Actions**.
+1. Nel repository GitHub: **Settings → Pages → Source: GitHub Actions**. Dalla v19 il workflow prova ad attivarlo da solo al primo giro, ma se il repository è appena nato conviene controllare che la voce sia impostata.
 2. **Settings → Secrets and variables → Actions → Variables → New variable**: nome `PONTE`, valore l'indirizzo `/exec` della tua web app Apps Script (lo stesso che usi per votare dalla app). Dev'essere una **Variable**, non un **Secret**: i secret non sono leggibili come `vars.PONTE` e la pagina resterebbe senza indirizzo. Se la variabile manca il workflow pubblica lo stesso, con un avviso, e la pagina si apre ma rifiuta di votare.
 3. Fai un push (o lancia il workflow a mano): la Action pubblica solo la cartella `scheda-html/` e ci inserisce l'indirizzo del ponte.
 4. Nel foglio: **Interfaccia di voto → Usa la pagina web (HTML)…** e incolla l'indirizzo della pagina pubblicata.
