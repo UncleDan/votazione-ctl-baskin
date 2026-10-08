@@ -1,5 +1,8 @@
 # Changelog
 
+## v19
+- La GitHub Action attiva GitHub Pages da sola al primo giro (`enablement: true`). Prima, su un repository dove Pages non era ancora acceso, il workflow si fermava con *Get Pages site failed — Not Found*: ora lo accende e prosegue, e resta comunque possibile farlo a mano da *Settings → Pages → Source: GitHub Actions*.
+
 ## v18
 - La GitHub Action non si ferma più se manca la variabile `PONTE`: pubblica lo stesso e lascia un avviso. Così si vede subito la pagina e si imposta l'indirizzo del ponte dopo, senza il giro vizioso "non pubblico finché non ho l'URL, non ho l'URL finché non pubblico". Finché la variabile manca, la pagina si apre ma rifiuta di votare, dicendo che l'indirizzo non è configurato.
 

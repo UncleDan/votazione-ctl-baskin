@@ -50,7 +50,14 @@ jobs:
           print("Ponte inserito:", sys.argv[1])
           PY
 
+      # enablement: true accende Pages da sola al primo giro, se non e gia attivo
+      # (serve il permesso pages: write, dichiarato sopra). Senza, il primo run
+      # fallisce con "Get Pages site failed" finche' non lo si attiva a mano in
+      # Settings -> Pages -> Source: GitHub Actions.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
 
       # Va in rete solo questa cartella: il resto del repository (Code.gs,
       # documentazione, test) resta nel repo ma non viene pubblicato.
