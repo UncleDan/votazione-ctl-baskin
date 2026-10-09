@@ -33,7 +33,7 @@ foglio('Candidati').getRange(2, 1, 4, 4).setValues([
   ['Candidato A', 'Allenatore', 'Squadra 1', 3],
   ['Candidato B', 'Allenatore', 'Squadra 3', 2],
   ['Candidato C', 'Aiuto allenatore', 'Squadra 4', 5],
-  ['Candidato D', 'Allenatore', 'Squadra 2', 1]
+  ['Candidato D', 'Altro', 'Autocandidatura', 1]     // autocandidato: non occupa il posto di nessuna societa
 ]);
 generaCodici();
 const cod = codici('Società', 1);
@@ -164,27 +164,38 @@ verifica((function () { try { return ScriptApp.getService().getUrl(); } catch (e
 // ---------------- Azzeramento 3: dati di prova ----------------
 console.log('\n=== Azzeramento 3: tutto e dati di prova');
 inizializzaDatiProva();
-verifica(numSocieta_() === 11 && squadre_().length === 16 && candidati_().length === 13,
-  'ricaricati 11 societa, 16 squadre, 13 candidati');
+verifica(numSocieta_() === 11 && squadre_().length === 16 && candidati_().length === 11,
+  'ricaricati 11 societa, 16 squadre, 11 candidati');
+verifica(societaDoppie_().length === 0, 'i dati di prova rispettano "una societa, un solo candidato"');
+verifica(candidati_().filter(k => k.auto).length === 1, 'e c\'e un autocandidato, che dalla regola e escluso');
 verifica(codici('Società', 1).length === 11, 'e 11 codici nuovi');
 verifica(foglio('Messaggi').d.slice(1).filter(r => r[0]).length === 11,
   'il foglio "Messaggi" ha una riga per societa');
 // ---- nome breve ----
 const shSoc = foglio('Società');
 verifica(shSoc.d[0][4] === 'Nome breve', 'il foglio Società ha la colonna "Nome breve"');
-verifica(shSoc.d.slice(1).filter(r => r[0]).every(r => r[4] === r[0]),
-  'all\'inizializzazione il nome breve parte uguale alla ragione sociale');
+verifica(shSoc.d.slice(1).filter(r => r[0]).every(r => r[4] && r[4] !== r[0]),
+  'i dati di prova portano un nome breve piu corto della ragione sociale');
+verifica(shSoc.d[0][5] === 'Email' && shSoc.d[0][6] === 'Codice affiliazione',
+  'il foglio Società ha le colonne "Email" e "Codice affiliazione"');
+verifica(shSoc.d.slice(1).filter(r => r[0]).every(r => /@example\.invalid$/.test(String(r[5])) && r[6]),
+  'con email di prova non recapitabili e codice di affiliazione');
 shSoc.getRange(2, 5).setValue('Alfa');     // il Coordinatore lo accorcia
 preparaMessaggi();
-verifica(foglio('Messaggi').d[1][0] === 'Alfa', 'nei messaggi il destinatario e il nome breve');
-verifica(/Ciao Alfa,/.test(String(foglio('Messaggi').d[1][2])), 'e il saluto usa il nome breve');
+const rAlfa = foglio('Messaggi').d.find(r => r[0] === 'Alfa') || [];
+verifica(rAlfa.length > 0, 'nei messaggi il destinatario e il nome breve');
+verifica(/Ciao Alfa,/.test(String(rAlfa[3])), 'e il saluto usa il nome breve');
 verifica(codiciMap_()[Object.keys(codiciMap_())[0]] !== undefined, 'i codici restano mappati');
 verifica(codiciMap_()[norm_(codici('Società', 1)[0])] === 'Alfa',
   'la pagina di voto riceve il nome breve, non la ragione sociale');
 
-verifica(/link riservato alla vostra società/.test(String(foglio('Messaggi').d[1][2])) &&
-  /RICEVUTA/.test(String(foglio('Messaggi').d[1][2])),
+verifica(/link riservato alla vostra società/.test(String(foglio('Messaggi').d[1][3])) &&
+  /RICEVUTA/.test(String(foglio('Messaggi').d[1][3])),
   'e il messaggio contiene link e spiegazione della ricevuta');
+verifica(/inoltr/i.test(String(foglio('Messaggi').d[1][3])),
+  'e dice che il messaggio si puo inoltrare a un\'altra persona della societa');
+verifica(/^=HYPERLINK\("mailto:/.test(String(foglio('Messaggi').d[1][4])),
+  'con email presente, l\'ultima colonna apre la mail gia scritta');
 verifica(foglio('Società').d[0][0] === 'Società' && foglio('Candidati').d[0][0] === 'Candidato',
   'le intestazioni dei fogli sono al loro posto dopo gli azzeramenti');
 

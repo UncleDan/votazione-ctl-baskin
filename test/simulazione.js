@@ -45,7 +45,7 @@ foglio('Squadre').getRange(2, 1, squadre.length, 2).setValues(squadre);
 const cand = [ // nome, qualifica, squadra, anni
   ['Candidato A', 'Allenatore', 'Squadra 01', 4], ['Candidato B', 'Allenatore', 'Squadra 03', 4],
   ['Candidato C', 'Autocandidatura', 'Squadra 05', 5], ['Candidato D', 'Allenatore', 'Squadra 07', 2],
-  ['Candidato E', 'Allenatore', 'Squadra 09', 3], ['Candidato F', 'Autocandidatura', 'Squadra 10', 3],
+  ['Candidato E', 'Allenatore', 'Squadra 11', 3], ['Candidato F', 'Autocandidatura', 'Squadra 10', 3],
   ['Candidato G', 'Allenatore', 'Squadra 12', 3], ['Candidato H', 'Allenatore', 'Squadra 14', 1],
   ['Candidato I', 'Aiuto allenatore', 'Squadra 15', 6], ['Candidato L', 'Aiuto allenatore', 'Squadra 16', 1]
 ];
@@ -147,7 +147,7 @@ verifica(/manualmente/.test(M.alerts[M.alerts.length - 1]), 'un quarto ballottag
 
 console.log('\n=== Logo');
 ['Report', 'Riepilogo urna', 'Risultati ballottaggi'].forEach(n =>
-  verifica(/^=IMAGE\("https:\/\/eisi\.it\/.*\.png", 1\)$/.test(foglio(n).d[0][0]), 'logo in testa al foglio "' + n + '"'));
+  verifica(/^=IMAGE\(Config!\$B\$\d+\)$/.test(foglio(n).d[0][0]), 'logo in testa al foglio "' + n + '" (formula verso Config, non URL fisso)'));
 ['Risultati', 'Risultati Presidente', 'Risultati Vice'].forEach(n =>
   verifica(foglio(n).d.some(r => /^=IMAGE\(/.test(r[0])), 'logo nel piede del foglio "' + n + '"'));
 verifica(foglio('Report').d.some(r => /Ente Italiano Sport Inclusivi/.test(r[0])), 'nota di proprietà del logo nei resoconti');

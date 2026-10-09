@@ -1,6 +1,6 @@
 /**
  * Votazione CTL Baskin — voto online anonimo, un voto per società
- * v9 — Google Apps Script legato a un Foglio Google
+ * v21 — Google Apps Script legato a un Foglio Google
  *
  * Codice sorgente: https://github.com/UncleDan/votazione-ctl-baskin
  * Copyright (c) 2026 Daniele Lolli (UncleDan) — Licenza MIT (vedi LICENSE)
@@ -35,24 +35,25 @@ const SH = {
   MSG: 'Messaggi'
 };
 const REPO_URL = 'https://github.com/UncleDan/votazione-ctl-baskin';
-const VERSIONE = 'v20';
+const VERSIONE = 'v21';
 const LOGO_SVG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg';
 const LOGO_PNG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png';
 const PROPRIETA_LOGO = 'Logo © Ente Italiano Sport Inclusivi (EISI), tutti i diritti riservati';
 const P_SALT = 'SALT';
+const P_AVVISO = 'AVVISO_APERTURA';   // una sola mail di apertura per contesto
 const MAX_BALLOTTAGGI = 3;
 const ROUND = {
   1: { nome: 'Commissari CTL', ballots: 'BALLOTS', used: 'USED', ric: 'RIC', prefisso: 'Stai votando per la società: ' },
   2: { nome: 'Presidente CTL', ballots: 'BALLOTS_2', used: 'USED_2', ric: 'RIC_2', ris: SH.RP, col: 'Votato Presidente', cfg: 'Presidente', prefisso: 'Stai votando come: ' },
   3: { nome: 'Vice CTL', ballots: 'BALLOTS_3', used: 'USED_3', ric: 'RIC_3', ris: SH.RV, col: 'Votato Vice', cfg: 'Vice', prefisso: 'Stai votando come: ' }
 };
-const SOC_HEADER = ['Società', 'Codice', 'Link diretto di voto', 'Ha votato', 'Nome breve'];
+const SOC_HEADER = ['Società', 'Codice', 'Link diretto di voto', 'Ha votato', 'Nome breve', 'Email', 'Codice affiliazione'];
 const SQ_HEADER = ['Squadra', 'Società'];
 const CAND_HEADER = ['Candidato', 'Qualifica', 'Squadra', 'Anni tesseramento/incarichi (spareggio)', 'Note'];
 const COM_HEADER = ['Commissario', 'Qualifica', 'Squadra', 'Codice', 'Link diretto di voto', 'Votato Presidente', 'Votato Vice'];
 const BAL_HEADER = ['Votante', 'Codice ballottaggio', 'Link diretto di voto', 'Ha votato'];
 const RIS_HEADER = ['Posizione', 'Candidato', 'Qualifica', 'Squadra', 'Preferenze', 'Anni (spareggio)', 'Esito', 'Note'];
-const MSG_HEADER = ['Destinatario', 'Codice', 'Messaggio da copiare e incollare'];
+const MSG_HEADER = ['Destinatario', 'Codice', 'Email', 'Messaggio da copiare e incollare', 'Apri la mail già scritta'];
 const LETTERE = 'ABCDEFGH';      // codici: 4 lettere A–H
 const CIFRE = '0123456789';      // + 4 cifre, nel formato XXXX-9999
 const FUSO = 'Europe/Rome';
@@ -66,6 +67,7 @@ const BLU = '#e8eaf6';
 const INTERFACCE = ['Semplice', 'HTML'];   // una sola attiva per votazione
 const CFG_INTERFACCIA = 'Interfaccia di voto';
 const CFG_URL_HTML = 'Indirizzo interfaccia HTML';
+const CFG_MITTENTE = 'Mittente email';
 
 /* ================= Menu ================= */
 
@@ -99,7 +101,9 @@ function onOpen() {
       .addItem('Programma apertura e chiusura', 'programmaVotazioni')
       .addItem('Mostra pianificazione', 'mostraPianificazione')
       .addItem('Annulla pianificazione', 'annullaPianificazione'))
-    .addItem('Prepara i messaggi per i votanti', 'preparaMessaggiMenu')
+    .addSubMenu(ui.createMenu('Messaggi ai votanti')
+      .addItem('Prepara i messaggi', 'preparaMessaggiMenu')
+      .addItem('Invia per email a chi ha l\'indirizzo…', 'inviaMessaggiEmail'))
     .addSubMenu(ui.createMenu('Interfaccia di voto')
       .addItem('Usa la app Google (semplice)', 'usaInterfacciaSemplice')
       .addItem('Usa la pagina web (HTML)…', 'usaInterfacciaHtml')
@@ -199,7 +203,8 @@ function setup() {
     ['Logo pagina web', LOGO_SVG, 'URL del logo sulla pagina di voto (hotlinking, SVG o PNG). Vuoto = nessun logo'],
     ['Logo fogli (PNG)', LOGO_PNG, 'URL del logo nei resoconti: i fogli Google non mostrano SVG, serve PNG/JPG. Vuoto = nessun logo'],
     [CFG_INTERFACCIA, 'HTML', 'Da dove si vota: Semplice = app Google; HTML = pagina su GitHub Pages. Una sola per votazione, gestita dal menu'],
-    [CFG_URL_HTML, '', 'Indirizzo della pagina su GitHub Pages. Serve solo con l\'interfaccia HTML: entra nei link inviati ai votanti']
+    [CFG_URL_HTML, '', 'Indirizzo della pagina su GitHub Pages. Serve solo con l\'interfaccia HTML: entra nei link inviati ai votanti'],
+    [CFG_MITTENTE, '', 'Nome del mittente delle email ai votanti. Vuoto = "Sezione Territoriale Baskin EISI " piu la Sezione. L\'indirizzo resta quello del tuo account Google']
   ].forEach(r => ensureCfgRow_(r[0], r[1], r[2]));
   cfgCell_(CFG_INTERFACCIA).setDataValidation(
     SpreadsheetApp.newDataValidation().requireValueInList(INTERFACCE, true).setAllowInvalid(false).build());
@@ -207,7 +212,7 @@ function setup() {
   ['Apertura voto commissari', 'Chiusura voto commissari', 'Apertura voto presidente', 'Chiusura voto presidente']
     .forEach(k => cfgCell_(k).setNumberFormat('dd/mm/yyyy hh:mm'));
 
-  ensureSheet_(ss, SH.SOC, SOC_HEADER);
+  assicuraIntestazione_(ensureSheet_(ss, SH.SOC, SOC_HEADER), SOC_HEADER);
   ensureSheet_(ss, SH.SQ, SQ_HEADER);
   const cand = ensureSheet_(ss, SH.CAND, CAND_HEADER);
   if (!headers_(cand).qualifica) {  // v1/v2: Candidato | Anni | Note
@@ -223,6 +228,10 @@ function setup() {
   const spostate = migraAutocandidature_();
   if (spostate) avvisi.push(spostate + ' candidati avevano "' + AUTOCAND + '" come qualifica: ora la qualifica e "Altro" e ' +
     '"' + AUTOCAND + '" sta nella colonna Squadra, per chi non e tesserato con un club. Controlla il foglio "Candidati".');
+
+  const doppie = societaDoppie_();
+  if (doppie.length) avvisi.push('Ogni societa puo presentare un solo candidato, e queste ne hanno piu di uno:\n' +
+    doppie.join('\n') + '\n\nRitira i candidati in eccesso nel foglio "Candidati": il round 1 non si apre finche restano.');
 
   applicaValidazioni_();
   const props = PropertiesService.getScriptProperties();
@@ -291,6 +300,24 @@ function svuotaFoglio_(ss, name, header) {
   return sh;
 }
 
+/**
+ * Rimette le intestazioni che mancano a destra: serve quando una versione nuova
+ * aggiunge una colonna a un foglio che esiste gia (la v21 aggiunge "Email" a
+ * "Societa"). Non tocca le colonne gia intestate, quindi non rinomina nulla.
+ */
+function assicuraIntestazione_(sh, header) {
+  const largo = Math.max(sh.getLastColumn(), 1);
+  const att = sh.getRange(1, 1, 1, largo).getValues()[0].map(x => String(x).trim());
+  if (sh.getMaxColumns() < header.length) sh.insertColumnsAfter(sh.getMaxColumns(), header.length - sh.getMaxColumns());
+  let q = 0;
+  header.forEach((h, i) => {
+    if (String(att[i] || '').trim()) return;
+    sh.getRange(1, i + 1).setValue(h).setFontWeight('bold').setBackground(BLU);
+    q++;
+  });
+  return q;
+}
+
 function ensureSheet_(ss, name, header) {
   let sh = ss.getSheetByName(name);
   if (sh) return sh;
@@ -328,6 +355,9 @@ function applicaValidazioni_() {
     SpreadsheetApp.newDataValidation().requireValueInList(elencoSq, true).setAllowInvalid(true).build());
   sq.getRange(2, 2, Math.max(sq.getMaxRows() - 1, 1), 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireValueInRange(soc.getRange('A2:A'), true).setAllowInvalid(true).build());
+  // email delle societa: avvisa se non e un indirizzo, ma lascia scrivere
+  if (soc.getMaxColumns() >= 6) soc.getRange(2, 6, Math.max(soc.getMaxRows() - 1, 1), 1).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireTextIsEmail().setAllowInvalid(true).build());
 }
 
 /* ================= Round 1: codici società ================= */
@@ -493,9 +523,207 @@ function aggiornaLink_() {
 function preparaMessaggiMenu() {
   const n = preparaMessaggi();
   ui_().alert(n
-    ? n + ' messaggi pronti nel foglio "Messaggi".\n\nUna riga per votante: copia la cella della terza ' +
-      'colonna e incollala nella chat. Il link dentro il messaggio e gia quello personale.'
+    ? n + ' messaggi pronti nel foglio "Messaggi".\n\nUna riga per votante: copia la cella "Messaggio da copiare ' +
+      'e incollare" e incollala nella chat. Il link dentro il messaggio e gia quello personale.\n\n' +
+      'Se nella colonna "Email" c\'e un indirizzo, l\'ultima colonna porta un link che apre la mail con ' +
+      'destinatario, oggetto e testo gia scritti: resta da rileggerla e mandarla. Gli indirizzi scritti qui ' +
+      'vengono ricopiati nel foglio "Societa", cosi non si perdono quando i messaggi si rifanno.'
     : 'Nessun votante per il round attivo: genera prima i codici (o prepara i commissari).');
+}
+
+/** Codice normalizzato -> email, dal foglio "Societa" (l'unico posto dove resta). */
+function emailMap_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(SH.SOC);
+  const m = {};
+  if (!sh || sh.getLastRow() < 2 || sh.getLastColumn() < 6) return m;
+  sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues()
+    .forEach(r => { const k = norm_(r[1]), e = String(r[5]).trim(); if (k && e) m[k] = e; });
+  return m;
+}
+
+/**
+ * Il foglio "Messaggi" si rifa da capo ogni volta, quindi un indirizzo scritto
+ * li dentro andrebbe perso: prima di riscriverlo lo si travasa nel foglio
+ * "Societa", dove resta. Cosi l'indirizzo si puo scrivere in entrambi i posti.
+ */
+function assorbiEmailMessaggi_() {
+  const ss = SpreadsheetApp.getActive();
+  const msg = ss.getSheetByName(SH.MSG), soc = ss.getSheetByName(SH.SOC);
+  if (!msg || !soc || msg.getLastRow() < 2 || msg.getLastColumn() < 3 || soc.getLastRow() < 2) return 0;
+  const m = {};
+  msg.getRange(2, 1, msg.getLastRow() - 1, 3).getValues()
+    .forEach(r => { const k = norm_(r[1]), e = String(r[2]).trim(); if (k && e.indexOf('@') > 0) m[k] = e; });
+  if (!Object.keys(m).length) return 0;
+  const n = soc.getLastRow() - 1;
+  const v = soc.getRange(2, 1, n, 6).getValues();
+  let q = 0;
+  v.forEach(r => { const e = m[norm_(r[1])]; if (e && !String(r[5]).trim()) { r[5] = e; q++; } });
+  if (q) soc.getRange(2, 1, n, 6).setValues(v);
+  return q;
+}
+
+/**
+ * All'apertura manda a ogni votante che ha un indirizzo il suo link, con dentro
+ * la data di chiusura. Parte una volta per contesto (round + ballottaggio): se
+ * il round viene chiuso e riaperto non si ripete, per non intasare nessuno.
+ * L'azzeramento del round la rimette in gioco.
+ */
+function avvisaAperturaEmail_(c, x) {
+  const props = PropertiesService.getScriptProperties();
+  const chiave = P_AVVISO + '_' + x.r + '_' + x.b;
+  if (props.getProperty(chiave)) return { gia: true, fatte: 0, senza: [], errori: [] };
+  const map = votantiMap_(x.r, x.b);
+  const mail = emailMap_();
+  const oggetto = oggettoApertura_(c, x);
+  const mittente = mittente_(c);
+  const fatte = [], senza = [], errori = [];
+  Object.keys(map).sort((a, b) => map[a].localeCompare(map[b], 'it')).forEach(k => {
+    const v = vaglia_(mail[k]);
+    if (!v.buoni.length) return senza.push(map[k] + (v.sbagliati.length ? ' (non valido: ' + v.sbagliati.join(', ') + ')' : ''));
+    try {
+      MailApp.sendEmail({ to: v.buoni.join(','), subject: oggetto, body: testoApertura_(c, x, map[k], k), name: mittente });
+      fatte.push(map[k]);
+    } catch (err) { errori.push(map[k] + ': ' + ((err && err.message) || err)); }
+  });
+  if (fatte.length) props.setProperty(chiave, new Date().toISOString());
+  return { gia: false, fatte: fatte.length, senza: senza, errori: errori };
+}
+
+/** Riassunto dell'avviso di apertura, da attaccare al messaggio del menu. */
+function esitoAvviso_(av) {
+  if (!av || av.gia) return '\n\nAvviso di apertura: già mandato per questo round, non lo ripeto.';
+  if (!av.fatte && !av.senza.length && !av.errori.length) return '';
+  return '\n\nAvviso di apertura per email: ' + av.fatte + ' inviati.' +
+    (av.senza.length ? '\nSenza indirizzo (da avvisare a mano): ' + av.senza.join(', ') : '') +
+    (av.errori.length ? '\nNon partiti: ' + av.errori.join('; ') : '');
+}
+
+function oggettoApertura_(c, x) {
+  return String(c['Titolo'] || 'Elezione CTL Baskin') +
+    (x.b ? ' — ballottaggio aperto: si vota da adesso' : ' — si vota da adesso');
+}
+
+/**
+ * Il messaggio di apertura e quello di sempre, con davanti la riga che dice che
+ * l'urna e aperta adesso. La data di chiusura e dentro il messaggio quando la
+ * votazione e programmata; quando e stata aperta a mano non esiste, e si dice.
+ */
+function testoApertura_(c, x, nome, codice) {
+  const quando = testoProgramma_(c);
+  return 'La votazione è APERTA: si vota da adesso.' +
+    (quando ? '' : ' La data di chiusura viene comunicata dal Coordinatore della Sezione Territoriale: ' +
+      'conviene non rimandare.') + '\n\n' + testoMessaggio_(c, x, nome, codice);
+}
+
+/** Oggetto della mail: uguale per tutti, senza niente di riservato dentro. */
+function oggettoMessaggio_(c, x) {
+  return String(c['Titolo'] || 'Elezione CTL Baskin') +
+    (x.b ? ' — ballottaggio: il link per votare' : ' — il link per votare');
+}
+
+/**
+ * Link che apre il programma di posta con destinatario, oggetto e testo gia
+ * scritti. Non spedisce niente: la mail si apre, si rilegge e si manda a mano.
+ * Attenzione alla lunghezza: i client tagliano gli indirizzi mailto oltre un
+ * limite che cambia da programma a programma (fra i 2000 e i 4000 caratteri),
+ * e il nostro testo e lungo. Se il corpo arriva troncato, si usa l'invio
+ * diretto dal menu, che non ha questo limite.
+ */
+function mailtoFormula_(email, oggetto, testo) {
+  const v = vaglia_(email);
+  // qui entrano anche i domini di prova: il link apre la mail, non la manda,
+  // quindi con i dati finti si puo vedere com'e fatta senza spedire niente
+  const a = v.buoni.concat(v.finti);
+  if (!a.length) return '';
+  const url = 'mailto:' + a.map(x => encodeURIComponent(x).replace(/%40/g, '@')).join(',') +
+    '?subject=' + encodeURIComponent(oggetto) + '&body=' + encodeURIComponent(testo);
+  return '=HYPERLINK("' + url.replace(/"/g, '%22') + '","✉ Apri la mail")';
+}
+
+/** Indirizzo singolo scrivibile: forma plausibile e non un dominio riservato alle prove. */
+function emailBuona_(e) {
+  const s = String(e).trim();
+  return /^[^@\s,;]+@[^@\s,;]+\.[a-z]{2,}$/i.test(s) && !emailFinta_(s);
+}
+
+/** Dominio riservato alle prove: esiste per non recapitare a nessuno. */
+function emailFinta_(e) {
+  const s = String(e).trim();
+  return /\.(invalid|test|localhost)$/i.test(s) || /@(example|esempio)\.[a-z]+$/i.test(s);
+}
+
+/**
+ * Una cella "Email" puo contenere piu indirizzi separati da virgola o punto e
+ * virgola: una societa ha spesso due referenti. Li divide e li smista in buoni,
+ * di prova e sbagliati, cosi chi manda sa prima cosa partira e cosa no.
+ * Nota: a una societa con due indirizzi arriva due volte lo stesso link, che e
+ * lo stesso che succede se se lo inoltrano fra loro. La scheda resta una sola:
+ * il codice si usa una volta.
+ */
+function vaglia_(cella) {
+  const r = { buoni: [], finti: [], sbagliati: [] };
+  String(cella || '').split(/[,;]/).forEach(x => {
+    const s = x.trim();
+    if (!s) return;
+    if (emailFinta_(s)) r.finti.push(s);
+    else if (emailBuona_(s)) r.buoni.push(s);
+    else r.sbagliati.push(s);
+  });
+  return r;
+}
+
+/**
+ * Manda i messaggi per email dall'account che ha il foglio aperto: una mail per
+ * votante, con il suo link dentro. Niente copia conoscenza e niente invii
+ * multipli nello stesso messaggio: il link e personale e non va in giro.
+ */
+function inviaMessaggiEmail() {
+  const ui = ui_(), c = cfg_();
+  const x = contesto_(c);
+  if (x.errore) return ui.alert('Votazione non disponibile: ' + x.errore);
+  const map = votantiMap_(x.r, x.b);
+  if (!Object.keys(map).length) return ui.alert('Nessun votante per il round attivo: genera prima i codici.');
+  assorbiEmailMessaggi_();
+  const mail = emailMap_();
+  const con = [], senza = [], finti = [];
+  Object.keys(map).sort((a, b) => map[a].localeCompare(map[b], 'it')).forEach(k => {
+    const v = vaglia_(mail[k]);
+    if (v.sbagliati.length) senza.push(map[k] + ' (non valido: ' + v.sbagliati.join(', ') + ')');
+    if (v.buoni.length) return con.push({ k: k, nome: map[k], email: v.buoni.join(','), quanti: v.buoni.length });
+    if (v.finti.length) return finti.push(map[k]);
+    if (!v.sbagliati.length) senza.push(map[k]);
+  });
+  const restano = (senza.length ? '\n\nSenza indirizzo valido, da mandare a mano: ' + senza.join(', ') : '') +
+    (finti.length ? '\n\nIndirizzi di prova, li salto: ' + finti.join(', ') : '');
+  if (!con.length) return ui.alert('Nessun indirizzo a cui scrivere',
+    'Scrivi le email nel foglio "Societa" (colonna "Email") oppure nel foglio "Messaggi", poi riprova.' + restano,
+    ui.ButtonSet.OK);
+  let quota = 0;
+  try { quota = MailApp.getRemainingDailyQuota(); } catch (e) { quota = con.length; }
+  if (quota < con.length) return ui.alert('Quota email insufficiente',
+    'Da mandare: ' + con.length + '. Restano per oggi: ' + quota + '.\n\nRiprova domani, oppure manda a mano i messaggi ' +
+    'dal foglio "Messaggi".', ui.ButtonSet.OK);
+  const oggetto = oggettoMessaggio_(c, x);
+  if (ui.alert('Invio delle email',
+    'Mando ' + con.length + ' email dal tuo account Google, una per votante, con oggetto:\n' + oggetto +
+    (con.some(v => v.quanti > 1) ? '\n\nQualcuno ha piu di un indirizzo: a quelle societa il messaggio arriva a tutti i ' +
+      'referenti insieme (' + con.filter(v => v.quanti > 1).map(v => v.nome + ' ×' + v.quanti).join(', ') +
+      '). La scheda resta una sola: il codice si usa una volta.' : '') +
+    '\n\nA: ' + con.map(v => v.nome).join(', ') + restano +
+    '\n\nOgni messaggio contiene un link personale: parte un invio separato per ciascuno, senza copia conoscenza. ' +
+    'Procedere?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  const mittente = mittente_(c);
+  let fatte = 0;
+  const errori = [];
+  con.forEach(v => {
+    try {
+      MailApp.sendEmail({ to: v.email, subject: oggetto, body: testoMessaggio_(c, x, v.nome, v.k), name: mittente });
+      fatte++;
+    } catch (err) { errori.push(v.nome + ': ' + ((err && err.message) || err)); }
+  });
+  ui.alert(fatte + ' email inviate.' + restano +
+    (errori.length ? '\n\nNon partite: ' + errori.join('\n') : '') +
+    '\n\nControlla la posta inviata: quello che vedi li e esattamente quello che hanno ricevuto.');
 }
 
 /**
@@ -507,12 +735,21 @@ function preparaMessaggi() {
   const ss = SpreadsheetApp.getActive(), c = cfg_();
   const x = contesto_(c);
   const map = votantiMap_(x.r, x.b);
+  assorbiEmailMessaggi_();
+  const mail = emailMap_();
   const sh = svuotaFoglio_(ss, SH.MSG, MSG_HEADER);
+  const oggetto = oggettoMessaggio_(c, x);
   const righe = Object.keys(map).sort((a, b) => map[a].localeCompare(map[b], 'it'))
-    .map(k => [map[k], formattaCodice_(k), testoMessaggio_(c, x, map[k], k)]);
-  if (righe.length) sh.getRange(2, 1, righe.length, 3).setValues(righe);
-  sh.setColumnWidth(1, 220); sh.setColumnWidth(2, 110); sh.setColumnWidth(3, 620);
-  if (righe.length) sh.getRange(2, 3, righe.length, 1).setWrap(true).setVerticalAlignment('top');
+    .map(k => {
+      const testo = testoMessaggio_(c, x, map[k], k);
+      const e = String(mail[k] || '').trim();
+      return [map[k], formattaCodice_(k), e, testo, e ? mailtoFormula_(e, oggetto, testo) : ''];
+    });
+  if (righe.length) {
+    sh.getRange(2, 1, righe.length, MSG_HEADER.length).setValues(righe);
+    sh.getRange(2, 4, righe.length, 1).setWrap(true).setVerticalAlignment('top');
+  }
+  [220, 110, 230, 600, 170].forEach((w, i) => sh.setColumnWidth(i + 1, w));
   return righe.length;
 }
 
@@ -548,6 +785,12 @@ function testoMessaggio_(c, x, nome, codice) {
     'Si possono esprimere fino a ' + x.max + ' preferenze, e l\'ordine non conta.') +
     ' Si vota una volta sola: il codice non si riusa.');
   if (quando) r.push(quando);
+  if (soc) {
+    r.push('');
+    r.push('Se preferite che voti un\'altra persona della società, potete semplicemente inoltrarle ' +
+      'questo messaggio: il voto è identificato dal codice, non da chi lo usa, e vale per una volta sola. ' +
+      'Mettetevi d\'accordo, però: la prima scheda depositata chiude il voto della società.');
+  }
   r.push('');
   r.push('IMPORTANTE — Dopo aver depositato la scheda compare una RICEVUTA, un codice tipo 7K2M-94QD. ' +
     (soc ? 'Fatele' : 'Falle') + ' subito uno screenshot, oppure ' + (soc ? 'trascrivetela' : 'trascrivila') +
@@ -565,35 +808,81 @@ function testoMessaggio_(c, x, nome, codice) {
 /**
  * Riempie i fogli con societa, squadre e candidati inventati, ma negli stessi
  * numeri della Sezione Territoriale Emilia-Romagna 2026/2027: 11 societa,
- * 16 squadre, 13 candidati (9 allenatori e 4 aiuto allenatore, di cui uno
- * autocandidato senza squadra), due societa senza candidati. Serve per provare
+ * 16 squadre, 11 candidati (8 allenatori e 3 aiuto allenatore, di cui uno
+ * autocandidato senza squadra), una societa senza candidati. Serve per provare
  * il giro completo senza toccare i dati veri.
- * I nomi sono dell'alfabeto fonetico: nessuna persona e nessun club reale.
+ * Citta e personaggi Disney: non esiste nessuna societa cosi, e nessun nome puo
+ * essere confuso con una persona vera. Rispettano la regola "una societa, un
+ * solo candidato": l'autocandidato non conta, perche non e tesserato.
  */
+const PROVA_SOCIETA = [
+  ['Societa Sportiva Paperopoli ASD', 'Paperopoli', 'paperopoli@example.invalid', 'PRV-0001'],
+  ['Polisportiva Topolinia ASD', 'Topolinia', 'topolinia@example.invalid', 'PRV-0002'],
+  ['Baskin Agrabah ASD', 'Agrabah', 'agrabah@example.invalid', 'PRV-0003'],
+  ['A.S.D. Arendelle Sport', 'Arendelle', 'arendelle@example.invalid', 'PRV-0004'],
+  ['Atlantide Baskin ASD', 'Atlantide', 'atlantide@example.invalid', 'PRV-0005'],
+  ['Zootropolis Sport ASD', 'Zootropolis', 'zootropolis@example.invalid', 'PRV-0006'],
+  ['Monstropoli ASD', 'Monstropoli', 'monstropoli@example.invalid', 'PRV-0007'],
+  ['Radiator Springs ASD', 'Radiator Springs', 'radiatorsprings@example.invalid', 'PRV-0008'],
+  ['Motunui Baskin ASD', 'Motunui', 'motunui@example.invalid', 'PRV-0009'],
+  ['A.S.D. Corona Baskin', 'Corona', 'corona@example.invalid', 'PRV-0010'],
+  ['San Fransokyo ASD', 'San Fransokyo', 'sanfransokyo@example.invalid', 'PRV-0011']
+];
 const PROVA_SQUADRE = [
-  ['Alfa 1', 'Baskin Alfa'], ['Alfa 2', 'Baskin Alfa'], ['Alfa 3', 'Baskin Alfa'],
-  ['Bravo', 'Baskin Bravo'],
-  ['Charlie 1', 'Baskin Charlie'], ['Charlie 2', 'Baskin Charlie'],
-  ['Delta 1', 'Baskin Delta'], ['Delta 2', 'Baskin Delta'],
-  ['Echo 1', 'Baskin Echo'], ['Echo 2', 'Baskin Echo'],
-  ['Foxtrot', 'Baskin Foxtrot'], ['Golf', 'Baskin Golf'], ['Hotel', 'Baskin Hotel'],
-  ['India', 'Baskin India'], ['Juliett', 'Baskin Juliett'], ['Kilo', 'Baskin Kilo']
+  ['Paperopoli 1', 'Societa Sportiva Paperopoli ASD'],
+  ['Paperopoli 2', 'Societa Sportiva Paperopoli ASD'],
+  ['Paperopoli 3', 'Societa Sportiva Paperopoli ASD'],
+  ['Topolinia 1', 'Polisportiva Topolinia ASD'],
+  ['Topolinia 2', 'Polisportiva Topolinia ASD'],
+  ['Agrabah 1', 'Baskin Agrabah ASD'],
+  ['Agrabah 2', 'Baskin Agrabah ASD'],
+  ['Arendelle 1', 'A.S.D. Arendelle Sport'],
+  ['Arendelle 2', 'A.S.D. Arendelle Sport'],
+  ['Atlantide', 'Atlantide Baskin ASD'],
+  ['Zootropolis', 'Zootropolis Sport ASD'],
+  ['Monstropoli', 'Monstropoli ASD'],
+  ['Radiator Springs', 'Radiator Springs ASD'],
+  ['Motunui', 'Motunui Baskin ASD'],
+  ['Corona', 'A.S.D. Corona Baskin'],
+  ['San Fransokyo', 'San Fransokyo ASD']
 ];
 const PROVA_CANDIDATI = [
-  ['Candidato A', 'Aiuto allenatore', 'Alfa 1', 6, ''],
-  ['Candidato B', 'Aiuto allenatore', 'Alfa 2', 1, ''],
-  ['Candidato C', 'Allenatore', 'Bravo', 4, ''],
-  ['Candidato D', 'Allenatore', 'Bravo', 3, ''],
-  ['Candidato E', 'Aiuto allenatore', 'Bravo', 2, ''],
-  ['Candidato F', 'Aiuto allenatore', 'Charlie 1', 5, ''],
-  ['Candidato G', 'Allenatore', 'Delta 1', 4, ''],
-  ['Candidato H', 'Allenatore', 'Echo 2', 3, ''],
-  ['Candidato I', 'Allenatore', 'Foxtrot', 2, ''],
-  ['Candidato L', 'Allenatore', 'Golf', 5, ''],
-  ['Candidato M', 'Allenatore', 'Hotel', 1, ''],
-  ['Candidato N', 'Allenatore', 'India', 3, ''],
-  ['Candidato O', 'Allenatore', AUTOCAND, 0, 'allenatore non tesserato: si candida da se']
+  ['Paolino Paperino', 'Allenatore', 'Paperopoli 1', 6, ''],
+  ['Topolino', 'Allenatore', 'Topolinia 1', 5, ''],
+  ['Aladdin', 'Aiuto allenatore', 'Agrabah 2', 2, ''],
+  ['Elsa di Arendelle', 'Allenatore', 'Arendelle 1', 4, ''],
+  ['Kida Nedakh', 'Aiuto allenatore', 'Atlantide', 1, ''],
+  ['Judy Hopps', 'Allenatore', 'Zootropolis', 3, ''],
+  ['Mike Wazowski', 'Allenatore', 'Monstropoli', 2, ''],
+  ['Saetta McQueen', 'Allenatore', 'Radiator Springs', 4, ''],
+  ['Vaiana di Motunui', 'Aiuto allenatore', 'Motunui', 1, ''],
+  ['Rapunzel', 'Allenatore', 'Corona', 3, ''],
+  ['Archimede Pitagorico', 'Allenatore', AUTOCAND, 0, 'allenatore non tesserato: si candida da se']
 ];
+
+/**
+ * Nomi brevi ed email delle societa di prova. Le societa nascono dal foglio
+ * "Squadre" con la sola ragione sociale, quindi qui si rimettono il nome breve
+ * (quello che vedono i votanti), un indirizzo .invalid - esiste per provare il
+ * foglio "Messaggi", e per costruzione non recapita a nessuno - e un codice di
+ * affiliazione finto.
+ */
+function datiProvaSocieta_() {
+  const sh = sheet_(SH.SOC);
+  if (sh.getLastRow() < 2) return 0;
+  const n = sh.getLastRow() - 1;
+  const m = {};
+  PROVA_SOCIETA.forEach(r => m[r[0]] = r);
+  const v = sh.getRange(2, 1, n, 7).getValues();
+  let q = 0;
+  v.forEach(r => {
+    const p = m[String(r[0]).trim()];
+    if (!p) return;
+    r[4] = p[1]; r[5] = p[2]; r[6] = p[3]; q++;
+  });
+  sh.getRange(2, 1, n, 7).setValues(v);
+  return q;
+}
 
 function inizializzaDatiProva() {
   const ui = ui_(), ss = SpreadsheetApp.getActive();
@@ -604,9 +893,10 @@ function inizializzaDatiProva() {
   if (voti) return ui.alert('Ci sono gia ' + voti + ' voti espressi.\n\nUsa prima "Azzera round…": i dati di prova ' +
     'sostituiscono societa, squadre e candidati, e con voti in corso il conteggio non avrebbe senso.');
   if (ui.alert('Dati di prova',
-    'Sostituisco il contenuto dei fogli "Societa", "Squadre" e "Candidati" con dati inventati, negli stessi numeri ' +
-    'dell\'Emilia-Romagna: 11 societa, 16 squadre, 13 candidati di cui 4 aiuto allenatore e uno autocandidato, ' +
-    'e due societa senza candidati.\n\n' +
+    'Sostituisco il contenuto dei fogli "Societa", "Squadre" e "Candidati" con citta e personaggi Disney, negli stessi ' +
+    'numeri dell\'Emilia-Romagna: ' + PROVA_SOCIETA.length + ' societa, ' + PROVA_SQUADRE.length + ' squadre, ' +
+    PROVA_CANDIDATI.length + ' candidati (uno per societa, di cui 3 aiuto allenatore e uno autocandidato), ' +
+    'e una societa senza candidati.\n\n' +
     'I dati veri che fossero gia nei fogli vengono persi. Procedere?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
 
   setup();
@@ -615,8 +905,9 @@ function inizializzaDatiProva() {
   sheet_(SH.CAND).getRange(2, 1, PROVA_CANDIDATI.length, 5).setValues(PROVA_CANDIDATI);
   setCfg_('Titolo', 'Elezione CTL Baskin (PROVA)');
   setCfg_('Sezione Territoriale', 'Sezione di prova');
-  setCfg_('Formatore di riferimento', 'Candidato C');
+  setCfg_('Formatore di riferimento', 'Topolino');
   const nuovi = assegnaCodiciMancanti_(true);
+  datiProvaSocieta_();            // nomi brevi ed email, che nascono vuoti
   messaggiSicuro_();
   applicaValidazioni_();
   dopoAzzeramento_();
@@ -624,9 +915,9 @@ function inizializzaDatiProva() {
   const soc = numSocieta_();
   ui.alert('Dati di prova caricati.\n\n' +
     soc + ' societa, ' + PROVA_SQUADRE.length + ' squadre, ' + PROVA_CANDIDATI.length +
-    ' candidati (4 aiuto allenatore, 1 autocandidato).\n' +
+    ' candidati (uno per societa, 3 aiuto allenatore, 1 autocandidato).\n' +
     'Commissari da eleggere: ' + posti_(cfg_()) + '. Preferenze per scheda: ' + maxPref_(cfg_(), PROVA_CANDIDATI.length) + '.\n' +
-    nuovi + ' codici generati.\n\n' +
+    nuovi + ' codici generati. Le email sono @example.invalid: non recapitano a nessuno.\n\n' +
     'Il titolo e marcato (PROVA): toglilo quando passi ai dati veri.');
 }
 
@@ -696,6 +987,11 @@ function apriRound_(r) {
     const nomi = cand.map(x => x.nome);
     const doppi = nomi.filter((x, i) => nomi.indexOf(x) !== i);
     if (doppi.length) return ui.alert('Candidati con lo stesso nome: ' + doppi.join(', ') + '. Rendili distinguibili.');
+    // una societa, un candidato: e un requisito di candidatura, non un dettaglio
+    const doppieSoc = societaDoppie_();
+    if (doppieSoc.length) return ui.alert('Una società, un solo candidato',
+      'Ogni società può presentare un solo candidato. Queste ne hanno più di uno:\n\n' + doppieSoc.join('\n') +
+      '\n\nRitira i candidati in eccesso nel foglio "Candidati", poi riapri il round.', ui.ButtonSet.OK);
     if (!Object.keys(codiciMap_()).length) return ui.alert('Nessun codice: usa "Round 1 → Genera codici e link mancanti".');
     const senzaQ = cand.filter(x => !x.qualifica).map(x => x.nome);
     if (senzaQ.length && ui.alert('Qualifica mancante', 'Senza qualifica (trattati come allenatori): ' + senzaQ.join(', ') + '.\nAprire comunque?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
@@ -706,9 +1002,11 @@ function apriRound_(r) {
   setCfg_('Round attivo', r);
   setCfg_('Ballottaggio', 0);
   setCfg_('Stato', 'APERTA');
+  const c2 = cfg_();
+  const av = avvisaAperturaEmail_(c2, contesto_(c2));
   ui.alert('Round ' + r + ' – ' + ROUND[r].nome + ' APERTO.\nPosti: ' + postiRound_(r, c) +
     ', max preferenze per scheda: ' + maxPrefRound_(r, c, cand.length) +
-    '.\nNon modificare candidati e votanti finché è in corso.');
+    '.\nNon modificare candidati e votanti finché è in corso.' + esitoAvviso_(av));
 }
 
 /**
@@ -1084,8 +1382,10 @@ function apriBallottaggio() {
   if (!st || st.stato !== 'preparato') return ui.alert('Nessun ballottaggio preparato: usa "Ballottaggio → Prepara ballottaggio e nuovi link".');
   setCfg_('Ballottaggio', st.n);
   setCfg_('Stato', 'APERTA');
+  const c2 = cfg_();
+  const av = avvisaAperturaEmail_(c2, contesto_(c2));
   ui.alert('Ballottaggio ' + st.n + ' APERTO (round ' + r + ' – ' + ROUND[r].nome + ').\nPosti: ' + st.posti +
-    ' tra ' + st.candidati.join(', ') + '.');
+    ' tra ' + st.candidati.join(', ') + '.' + esitoAvviso_(av));
 }
 
 function calcolaBallottaggio() {
@@ -1715,6 +2015,7 @@ function azzeraUnRound_(r, c) {
   }
   if (balState_(r) && ss.getSheetByName(SH.BAL)) ss.getSheetByName(SH.BAL).clearContents();
   props.deleteProperty('BALSTATE_' + r);
+  for (let b = 0; b <= MAX_BALLOTTAGGI; b++) props.deleteProperty(P_AVVISO + '_' + r + '_' + b);
   if (roundAttivo_(c) === r) { setCfg_('Stato', 'CHIUSA'); setCfg_('Ballottaggio', 0); }
   if (r === 1) {
     const soc = sheet_(SH.SOC);
@@ -1877,7 +2178,7 @@ function cartello_(c, codice) {
     (dest
       ? '<a class="b" href="' + esc(dest) + '" target="_top">Vai alla pagina di voto</a>' +
         '<p class="n">Se il pulsante non funziona, copia questo indirizzo: ' + esc(dest) + '</p>'
-      : '<p class="n">L\'indirizzo della pagina non è ancora stato configurato: chiedilo al Coordinatore della Sezione Tecnica.</p>') +
+      : '<p class="n">L\'indirizzo della pagina non è ancora stato configurato: chiedilo al Coordinatore della Sezione Territoriale.</p>') +
     '<p class="n">Il tuo codice resta lo stesso: vale su entrambe le pagine, ma si può usare una volta sola.</p>' +
     '</div></main></body></html>';
   return HtmlService.createHtmlOutput(html)
@@ -2072,6 +2373,18 @@ function cfgCell_(key) {
 
 function sezione_(c) { return String(c['Sezione Territoriale'] || c['Sezione territoriale'] || '').trim(); }
 
+/**
+ * Nome che i votanti vedono come mittente delle email. Si imposta in Config;
+ * lasciandolo vuoto vale "Sezione Territoriale Baskin EISI <sezione>".
+ * L'indirizzo di posta resta quello dell'account che manda: questo e solo il
+ * nome visualizzato accanto.
+ */
+function mittente_(c) {
+  const cfg = c || cfg_();
+  const m = String(cfg[CFG_MITTENTE] || '').trim();
+  return m || ('Sezione Territoriale Baskin EISI ' + sezione_(cfg)).trim();
+}
+
 function anno_(c) {
   const v = c['Anno sportivo'];
   if (v instanceof Date) return Utilities.formatDate(v, 'Europe/Rome', 'yyyy/MM');
@@ -2093,11 +2406,17 @@ function scriviLinkRepo_(sh, riga) {
   sh.getRange(riga, 1).setRichTextValue(rt).setFontSize(9);
 }
 
-/** Logo in una cella (formula IMAGE, adattato alla cella). Restituisce true se inserito. */
+/**
+ * Logo in una cella. Restituisce true se inserito.
+ * La formula non porta l'indirizzo scritto dentro ma punta alla cella di Config
+ * che lo contiene: cambiando "Logo fogli (PNG)" si aggiornano tutti i fogli da
+ * soli, senza rigenerarli. E senza il secondo argomento di IMAGE, perche la
+ * modalita "adatta alla cella" fa dare errore alla formula.
+ */
 function scriviLogo_(sh, riga, c) {
   const url = String((c || cfg_())['Logo fogli (PNG)'] || '').trim();
   if (!/^https:\/\//i.test(url)) return false;
-  sh.getRange(riga, 1).setFormula('=IMAGE("' + url.replace(/"/g, '') + '", 1)');
+  sh.getRange(riga, 1).setFormula('=IMAGE(' + SH.CONFIG + '!$B$' + cfgCell_('Logo fogli (PNG)').getRow() + ')');
   sh.setRowHeight(riga, 110);
   return true;
 }
@@ -2157,6 +2476,26 @@ function squadre_() {
   return sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues()
     .filter(r => String(r[0]).trim())
     .map(r => ({ squadra: String(r[0]).trim(), societa: String(r[1]).trim() }));
+}
+
+/**
+ * Regola CTL: ogni societa puo presentare un solo candidato. Gli autocandidati
+ * non contano, perche non sono tesserati con nessun club e quindi non "occupano"
+ * il posto di nessuna societa. Restituisce una riga "Nome breve: tizio, caio"
+ * per ogni societa che ne ha piu di uno, in ordine alfabetico.
+ */
+function societaDoppie_() {
+  const brevi = nomiBrevi_(), sq = {}, m = {};
+  squadre_().forEach(x => { if (x.squadra) sq[x.squadra] = x.societa; });
+  candidati_().forEach(k => {
+    if (k.auto) return;
+    const s = sq[k.squadra] || k.squadra;      // squadra non in elenco: fa societa a se
+    if (!s) return;
+    (m[s] = m[s] || []).push(k.nome);
+  });
+  return Object.keys(m).filter(s => m[s].length > 1)
+    .sort((a, b) => String(brevi[a] || a).localeCompare(String(brevi[b] || b), 'it'))
+    .map(s => (brevi[s] || s) + ': ' + m[s].join(', '));
 }
 
 function mappaSquadraSocieta_() {

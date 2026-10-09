@@ -37,15 +37,22 @@ img{max-width:100%}
 
 .bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--card);border-bottom:1px solid var(--rule)}
 .bar-in{max-width:40rem;margin:0 auto;padding:12px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between}
-.mark{display:flex;gap:10px;align-items:center;min-width:0}
+.mark{display:flex;gap:10px;align-items:center;min-width:0;flex:1 1 auto}
 .mark img{height:26px;width:auto;flex:none}
 .mark-t{font:600 13px/1.2 var(--font-display);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mark-s{font:400 11px/1.3 var(--font-mono);color:var(--ink2);text-transform:uppercase;letter-spacing:.07em;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.count{flex:none;text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
-.count b{display:block;font:600 19px/1 var(--font-mono)}
-.count span{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink2)}
-.count.full b{color:var(--accent)}
+/* contatore delle preferenze: molti non sanno di poterne dare più di una,
+   quindi sta in un riquadro, grande, e cambia colore quando sono esaurite. */
+.count{flex:none;text-align:center;line-height:1;font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  border:2px solid var(--accent);border-radius:8px;background:var(--accent-soft);padding:6px 12px 5px}
+.count b{display:block;white-space:nowrap;font:700 clamp(22px,6.5vw,28px)/1 var(--font-mono);
+  color:var(--accent);letter-spacing:-.02em}
+/* solo l'etichetta: i numeri stanno dentro <b> e devono restare grandi */
+.count>span{display:block;white-space:nowrap;font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink2);margin-top:3px}
+.count.full{border-color:var(--ok);background:var(--ok-soft)}
+.count.full b{color:var(--ok)}
 
 main{max-width:40rem;margin:0 auto;padding-block:28px 56px;padding-left:16px;padding-right:16px}
 
@@ -60,6 +67,15 @@ main{max-width:40rem;margin:0 auto;padding-block:28px 56px;padding-left:16px;pad
 h1{font:700 clamp(23px,6vw,30px)/1.15 var(--font-display);letter-spacing:-.01em;margin:0 0 10px;text-wrap:balance}
 .lede{margin:0 0 26px;color:var(--ink2);max-width:34rem}
 .eyebrow{font:600 10px/1.4 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 8px}
+
+/* per chi si sta votando: è il controllo che il codice è quello giusto, quindi
+   il nome della società sta grande e in evidenza, non in occhiello. */
+.votante{margin:0 0 16px;padding:11px 14px;background:var(--card);border:1px solid var(--rule);
+  border-left:4px solid var(--accent);border-radius:0 6px 6px 0}
+.votante b{display:block;font:600 10px/1.4 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:4px}
+.votante i{display:block;font:600 clamp(20px,5.5vw,26px)/1.2 var(--font-display);font-style:normal;
+  color:var(--ink);text-wrap:balance}
 
 .panel{background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:18px}
 label.fld{display:block;font:600 11px/1.4 var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);margin-bottom:7px}
@@ -146,7 +162,7 @@ input[type=text]:focus-visible,button:focus-visible{outline:2px solid var(--acce
     </div>
     <div class="count" id="count" hidden>
       <b><span id="cNow">0</span>/<span id="cMax">0</span></b>
-      <span>preferenze</span>
+      <span id="cLab">preferenze</span>
     </div>
   </div>
 </header>
@@ -174,7 +190,7 @@ input[type=text]:focus-visible,button:focus-visible{outline:2px solid var(--acce
 <section id="s-accesso" hidden>
   <p class="eyebrow" id="acEyebrow">Accesso</p>
   <h1>Inserisci il codice della tua società</h1>
-  <p class="lede" id="acLede">Il codice è quello che hai ricevuto dal Coordinatore della Sezione Tecnica.
+  <p class="lede" id="acLede">Il codice è quello che hai ricevuto dal Coordinatore della Sezione Territoriale.
   Serve solo a garantire un voto per società: la scheda viene registrata senza codice, senza nome e senza orario.</p>
   <div class="panel">
     <label class="fld" for="codice">Codice di voto</label>
@@ -188,7 +204,7 @@ input[type=text]:focus-visible,button:focus-visible{outline:2px solid var(--acce
 </section>
 
 <section id="s-scheda" hidden>
-  <p class="eyebrow" id="scVotante"></p>
+  <p class="votante" id="scVotante" hidden></p>
   <h1 id="scTitolo">Scegli</h1>
   <p class="lede" id="scLede"></p>
   <div id="lista"></div>
@@ -244,7 +260,7 @@ input[type=text]:focus-visible,button:focus-visible{outline:2px solid var(--acce
   <h1>Non riesco a contattare il sistema di voto</h1>
   <p class="lede" id="erTesto"></p>
   <button class="btn" id="bRiprova">Riprova</button>
-  <p class="note">Se l'errore si ripete, avvisa il Coordinatore della Sezione Tecnica:
+  <p class="note">Se l'errore si ripete, avvisa il Coordinatore della Sezione Territoriale:
   la votazione può essere riaperta sulla app Google, dove il tuo codice vale allo stesso modo.</p>
 </section>
 
@@ -259,9 +275,22 @@ input[type=text]:focus-visible,button:focus-visible{outline:2px solid var(--acce
 <script>
 "use strict";
 
-/* Indirizzo del ponte Apps Script. La GitHub Action lo sostituisce al momento
-   della pubblicazione, prendendolo dalla variabile PONTE del repository. */
-var PONTE = "__PONTE__";
+/* Indirizzo del ponte Apps Script, in base64. La GitHub Action lo sostituisce
+   al momento della pubblicazione, prendendolo dalla variabile PONTE del
+   repository e codificandolo.
+
+   Il base64 NON e cifratura e non vuole esserlo: la pagina deve usare quell'URL,
+   quindi deve poterlo leggere, e chi apre gli strumenti per sviluppatori lo vede
+   comunque nella prima chiamata — e li che la richiesta deve andare. Serve solo a
+   non lasciarlo in chiaro nel sorgente della pagina, dove lo raccoglierebbe
+   qualunque crawler a caccia di endpoint Apps Script. Una tendina, non una
+   serratura: a proteggere il voto e il codice per societa, non questo indirizzo.
+   Senza un codice valido il ponte risponde solo a "info", cioe le stesse cose
+   che si leggono aprendo la pagina. */
+var PONTE_B64 = "__PONTE__";
+var PONTE = (function () {
+  try { return atob(PONTE_B64); } catch (e) { return PONTE_B64; }   // non sostituito: resta il segnaposto
+})();
 
 /* Freno ai tentativi a vuoto: dopo tre codici sbagliati il voto da questo
    dispositivo resta sospeso per un'ora. Il conteggio sta in una memoria tecnica
@@ -296,7 +325,10 @@ function show(id) {
    browser non manda il preflight, che Apps Script non sa gestire. */
 function chiama(payload) {
   if (/^__/.test(PONTE)) {
-    return Promise.reject(new Error("Indirizzo del ponte non configurato nella pubblicazione."));
+    var err = new Error("Questa pagina non è stata pubblicata con l'indirizzo del ponte: " +
+      "finché non c'è, non si può votare. Avvisa il Coordinatore della Sezione Territoriale.");
+    err.chiuso = true;         // non è un problema di rete: non aggiungere la spiegazione sulla rete
+    return Promise.reject(err);
   }
   return fetch(PONTE, { method: "POST", body: JSON.stringify(payload) })
     .then(function (r) {
@@ -306,8 +338,9 @@ function chiama(payload) {
 }
 
 function erroreRete(e) {
-  $("erTesto").textContent = (e && e.message ? e.message : String(e)) +
-    ". Può essere la rete del telefono, oppure il ponte non risponde.";
+  var msg = (e && e.message ? e.message : String(e));
+  $("erTesto").textContent = (e && e.chiuso) ? msg
+    : msg + ". Può essere la rete del telefono, oppure il ponte non risponde.";
   show("s-errore");
 }
 
@@ -351,6 +384,7 @@ function avvia() {
       $("fLogo").hidden = false;
     }
     $("cMax").textContent = i.max || 0;
+    $("cLab").textContent = i.max === 1 ? "preferenza" : "preferenze";
     if (!i.aperta) {
       $("chEyebrow").textContent = i.titolo || "Votazione";
       $("chTitolo").textContent = i.avviso ? "Si vota da un'altra pagina" : "La votazione non è aperta";
@@ -380,7 +414,7 @@ function aggiornaBlocco() {
   $("bVerifica").disabled = true;
   $("mAccesso").textContent = "Codice sbagliato tre volte: per sicurezza il voto da questo dispositivo " +
     "riprende fra " + tentMinuti(f) + " minuti. Se non trovi il codice, chiedilo al Coordinatore " +
-    "della Sezione Tecnica.";
+    "della Sezione Territoriale.";
   return true;
 }
 
@@ -401,7 +435,7 @@ function verifica() {
     }
     tentAzzera();
     CODICE = c;
-    $("scVotante").textContent = (INFO.prefisso || "") + r.votante;
+    votante(r.votante);
     $("faVotante").textContent = r.votante;
     costruisci();
     show("s-scheda");
@@ -410,6 +444,20 @@ function verifica() {
     $("bVerifica").textContent = "Apri la scheda";
     erroreRete(e);
   });
+}
+
+/* Per chi si sta votando. Il prefisso ("Stai votando per la società:") fa da
+   etichetta piccola, il nome resta grande: è l'unico modo che ha il votante di
+   accorgersi di avere in mano il codice di un'altra società. */
+function votante(nome) {
+  var p = $("scVotante");
+  p.textContent = "";
+  var et = String(INFO.prefisso || "").replace(/[\s:]+$/, "");
+  if (et) { var b = document.createElement("b"); b.textContent = et; p.appendChild(b); }
+  var i = document.createElement("i");
+  i.textContent = nome || "";
+  p.appendChild(i);
+  p.hidden = !(et || nome);
 }
 
 /* ---------------- scheda ---------------- */
