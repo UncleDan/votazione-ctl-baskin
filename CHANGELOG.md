@@ -1,5 +1,17 @@
 # Changelog
 
+## v22
+- **Tolto il link `mailto:`** dal foglio "Messaggi": dava errore nei client, e per sua natura non poteva funzionare bene — i programmi di posta tagliano gli indirizzi `mailto:` lunghi, e il nostro testo lo è. Al suo posto c'è qualcosa di più utile.
+- **Colonna "Rimanda"** nel foglio "Messaggi", con una casella per riga, e la voce *Messaggi ai votanti → Rimanda le email spuntate…*: si spunta chi dice di non aver ricevuto niente e si rimanda solo a quelli. A invio fatto le spunte si tolgono da sole.
+- **Colonna "Email" anche nel foglio "Commissari"**, per i round 2 e 3. Gli indirizzi si cercano per **nome** e non per codice, così continuano a valere anche nei ballottaggi, dove i codici cambiano.
+- **Due voci apposta per i messaggi del Presidente e del Vice**, che funzionano anche a round chiuso: si preparano prima di aprire. Il foglio "Messaggi" si ricorda per quale round è stato fatto, e l'invio usa quello, non il round attivo.
+- **Il messaggio c'è per tutti**, anche per chi non ha un indirizzo: quei messaggi si mandano per un altro canale, e a fine preparazione il programma dice chi è rimasto senza.
+- **Report e Riepilogo urna stanno in un A4 verticale**: quattro colonne di larghezza fissa (660 px in tutto) e testo a capo, al posto del ridimensionamento automatico che su una riga lunga allargava la colonna all'infinito e mandava la stampa su due pagine affiancate.
+- **"Inizializza / aggiorna fogli" rigenera anche Report, Riepilogo urna e Messaggi.** Prima no, e il risultato era che dopo un aggiornamento di versione quei fogli restavano com'erano — niente impaginazione A4, niente colonna "Rimanda" — e sembrava che il programma non fosse cambiato. Era una trappola: l'unica voce che uno lancia dopo aver aggiornato il codice è proprio quella.
+- Nelle righe che occupano la sola prima colonna (titoli, note, piede) le celle vengono **unite** sulle quattro colonne: col testo a capo, altrimenti, un titolo lungo si incolonnava dentro 180 pixel.
+- *Mostra interfaccia attiva e indirizzi* dice ora **la versione del codice**, da confrontare con quella in fondo alla pagina di voto: se la pagina ne mostra una più vecchia, la web app non è stata ridistribuita.
+- Versione aggiornata ovunque la si legge — pagina di voto, app Google, piede di tutti i resoconti — perché la prende dalla costante `VERSIONE`.
+
 ## v21
 - **Una società, un solo candidato.** Era la sola regola di candidatura che il programma non controllava. Ora il round 1 non si apre finché una società ne presenta più di uno: la segnalazione dice quale società e con quali nomi, e la stessa verifica compare fra gli avvisi di *Inizializza / aggiorna fogli*. Gli **autocandidati** sono esclusi dal conteggio, perché non sono tesserati con nessun club e quindi non occupano il posto di nessuno.
 - **Nuovi dati di prova**, con città e personaggi Disney al posto dell'alfabeto fonetico: `Società Sportiva Paperopoli ASD` → squadra `Paperopoli 1` → candidato `Paolino Paperino`. Stessi numeri dell'Emilia-Romagna — 11 società, 16 squadre, 11 candidati, uno per società più un autocandidato, una società senza candidati — e rispettano la regola nuova. Le email di prova sono `@example.invalid`: per costruzione non recapitano a nessuno, e l'invio diretto le salta.

@@ -19,7 +19,8 @@ Funziona con un Foglio Google e Google Apps Script: nessun server da gestire, ne
 - **Ricevuta di voto**: a scheda depositata il votante riceve un codice casuale, da fotografare o trascrivere; a spoglio concluso lo ritrova nel Riepilogo urna e sa che la sua scheda è stata contata, senza che la ricevuta riveli come ha votato.
 - **Ragione sociale e nome breve**: la prima resta per gli atti, il secondo è quello che vedono i votanti nei messaggi, sulla scheda e nei resoconti.
 - **Messaggi pronti**: un foglio con una riga per votante e il testo da copiare e incollare nella chat, link personale e spiegazioni comprese — fra cui che il messaggio si può inoltrare a un'altra persona della società, perché è il codice a identificare il voto.
-- **Email**: accanto a ogni messaggio un link che apre la mail già scritta, e una voce di menu che le manda tutte dal proprio account Google, una per votante e senza copia conoscenza. **All'apertura della votazione l'avviso parte da solo**, con dentro il link personale e la data di chiusura.
+- **Email**: una voce di menu manda i messaggi dal proprio account Google, uno per votante e senza copia conoscenza, e un'altra li rimanda solo a chi si spunta nel foglio. Gli indirizzi stanno in "Società" e in "Commissari", anche più d'uno per riga. **All'apertura della votazione l'avviso parte da solo**, con dentro il link personale e la data di chiusura.
+- **Report e Riepilogo urna stampabili in A4 verticale** senza ritocchi.
 - **Freno sui tentativi**: tre codici sbagliati e il voto da quel dispositivo si sospende per un'ora, con una memoria tecnica del browser che non traccia nulla.
 - **Report** finale e **Riepilogo urna** per il custode, con controllo di coerenza e schede anonime per il riconteggio.
 - **Sezione Territoriale** e **anno sportivo** sulla pagina di voto e nei report.

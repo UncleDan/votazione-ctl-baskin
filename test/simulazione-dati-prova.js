@@ -109,6 +109,22 @@ chiudiVotazione();
 apri1();
 verifica(M.email.length === 0, 'riaprendo non si ripete l\'avviso: parte una volta per round');
 
+// ---------------- Rimandare a chi dice di non aver ricevuto ----------------
+console.log('\n=== Rimandare la mail solo a qualcuno');
+preparaMessaggi();
+const shM = foglio('Messaggi');
+verifica(shM.d[0][4] === 'Rimanda', 'il foglio Messaggi ha la colonna "Rimanda"');
+verifica(shM.d.slice(1).filter(r => r[0]).every(r => String(r[3]).length > 100),
+  'il messaggio c\'e per tutti, anche per chi non avesse email');
+shM.getRange(3, 5).setValue(true);                 // spunta una riga sola
+M.email.length = 0;
+rimandaMessaggiEmail();
+verifica(M.email.length === 1, 'parte una mail sola: ' + M.email.length);
+verifica(shM.d[2][4] === false, 'e la spunta viene tolta, per non rimandare due volte');
+M.email.length = 0;
+rimandaMessaggiEmail();
+verifica(M.email.length === 0, 'senza spunte non parte niente');
+
 // ---------------- Piu indirizzi nella stessa cella ----------------
 console.log('\n=== Una societa puo avere piu indirizzi, separati da virgola');
 const v1 = vaglia_('uno@esempio-valido.it, due@esempio-valido.it ; tre@esempio-valido.it');
@@ -116,13 +132,7 @@ verifica(v1.buoni.length === 3, 'virgola e punto e virgola dividono: ' + v1.buon
 const v2 = vaglia_('buono@esempio-valido.it, non-un-indirizzo, prova@example.invalid');
 verifica(v2.buoni.length === 1 && v2.sbagliati.length === 1 && v2.finti.length === 1,
   'buoni, sbagliati e di prova vengono separati');
-verifica(/^=HYPERLINK\("mailto:uno@esempio-valido\.it,due@esempio-valido\.it/.test(
-  mailtoFormula_('uno@esempio-valido.it, due@esempio-valido.it', 'Oggetto', 'Testo')),
-  'il mailto elenca tutti i destinatari');
-verifica(mailtoFormula_('non-un-indirizzo', 'Oggetto', 'Testo') === '',
-  'senza nemmeno un indirizzo scrivibile non si scrive il link');
-verifica(/^=HYPERLINK\("mailto:prova@example\.invalid/.test(mailtoFormula_('prova@example.invalid', 'O', 'T')),
-  'ma un dominio di prova il link ce l\'ha: apre la mail, non la manda');
+verifica(vaglia_('  ').buoni.length === 0, 'una cella vuota non produce destinatari');
 // e l'invio arriva a entrambi
 shS.getRange(2, 6).setValue('primo@esempio-valido.it, secondo@esempio-valido.it');
 M.email.length = 0;
@@ -131,6 +141,17 @@ apri1();
 const multi = M.email.filter(e => /primo@esempio-valido\.it,secondo@esempio-valido\.it/.test(e.to));
 verifica(multi.length === 1, 'una sola mail, indirizzata a tutti e due i referenti');
 verifica(M.email.length === nSoc, 'e le altre societa ne ricevono sempre una a testa');
+
+// ---------------- "Inizializza / aggiorna fogli" rigenera i resoconti ----------------
+console.log('\n=== Dopo un aggiornamento di versione, setup() rifa report, urna e messaggi');
+foglio('Report').d = [];
+foglio('Riepilogo urna').d = [];
+foglio('Messaggi').d = [['Destinatario', 'Codice', 'Email', 'Messaggio', 'Apri la mail gia scritta']];
+setup();
+verifica(foglio('Report').d.some(r => String(r[0]).trim()), 'il foglio Report e stato riscritto');
+verifica(foglio('Riepilogo urna').d.some(r => String(r[0]).trim()), 'il Riepilogo urna e stato riscritto');
+verifica(foglio('Messaggi').d[0][4] === 'Rimanda',
+  'e il foglio Messaggi ha l\'intestazione nuova: "' + foglio('Messaggi').d[0][4] + '"');
 
 console.log(errori ? '\n' + errori + ' verifiche fallite.' : '\nTutte le verifiche superate.');
 process.exit(errori ? 1 : 0);

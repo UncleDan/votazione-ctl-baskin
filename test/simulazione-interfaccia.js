@@ -125,8 +125,23 @@ verifica(Number(riga[4]) === 2, 'Candidato A: 2 preferenze, una per porta — il
 verifica(usati_(1, 0).length === 3, '3 codici usati, uno per società');
 
 // ---------------- Azzeramento totale e riuso ----------------
-console.log('\n=== Azzeramento 1: solo i risultati, stessi codici');
+console.log('\n=== Messaggi per il Presidente, con le email dei commissari');
 preparaCommissari();
+const shCom = foglio('Commissari');
+verifica(shCom.d[0][7] === 'Email', 'il foglio Commissari ha la colonna "Email"');
+shCom.getRange(2, 8).setValue('commissario@esempio-valido.it');
+messaggiPresidente();
+const msg2 = foglio('Messaggi').d.slice(1).filter(r => r[0]);
+verifica(msg2.length === commissari_().length, 'una riga per commissario: ' + msg2.length);
+verifica(msg2[0][2] === 'commissario@esempio-valido.it' || msg2.some(r => r[2] === 'commissario@esempio-valido.it'),
+  'e l\'email del commissario finisce nel foglio Messaggi');
+verifica(msgContesto_().r === 2, 'i messaggi sanno di essere del round 2, anche se e aperto il round 1');
+verifica(msg2.every(r => /Presidente/.test(String(r[3]))), 'e il testo parla del Presidente');
+messaggiVice();
+verifica(foglio('Messaggi').d.slice(1).filter(r => r[0]).every(r => /Vice/.test(String(r[3]))),
+  'e con l\'altra voce di menu parla del Vice');
+
+console.log('\n=== Azzeramento 1: solo i risultati, stessi codici');
 const urlPrima = (function () { try { return ScriptApp.getService().getUrl(); } catch (e) { return ''; } })();
 const codPrima = codici('Società', 1).slice();
 azzeraRisultati();
@@ -194,8 +209,10 @@ verifica(/link riservato alla vostra società/.test(String(foglio('Messaggi').d[
   'e il messaggio contiene link e spiegazione della ricevuta');
 verifica(/inoltr/i.test(String(foglio('Messaggi').d[1][3])),
   'e dice che il messaggio si puo inoltrare a un\'altra persona della societa');
-verifica(/^=HYPERLINK\("mailto:/.test(String(foglio('Messaggi').d[1][4])),
-  'con email presente, l\'ultima colonna apre la mail gia scritta');
+verifica(foglio('Messaggi').d[0][4] === 'Rimanda' && foglio('Messaggi').d[1][4] === false,
+  'l\'ultima colonna e la spunta "Rimanda", che parte vuota');
+verifica(foglio('Messaggi').d.slice(1).filter(r => r[0]).every(r => String(r[3]).length > 100),
+  'il messaggio c\'e per tutti, anche per chi non ha email');
 verifica(foglio('Società').d[0][0] === 'Società' && foglio('Candidati').d[0][0] === 'Candidato',
   'le intestazioni dei fogli sono al loro posto dopo gli azzeramenti');
 
