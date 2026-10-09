@@ -1,4 +1,4 @@
-# Votazione CTL Baskin — istruzioni (v21)
+# Votazione CTL Baskin — istruzioni (v22)
 
 Voto online anonimo, utilizzabile da telefono senza account Google:
 
@@ -109,19 +109,23 @@ Vale la pena spiegarlo nella comunicazione che accompagna i link: una ricevuta c
 
 Il foglio **Messaggi** ha una riga per ogni votante del round attivo: *Destinatario · Codice · Email · Messaggio da copiare e incollare · Apri la mail già scritta*. Il testo sta tutto in **una sola cella**: la copi e la incolli nella chat della società, senza ricomporlo ogni volta. Dentro c'è il link personale, il codice, quante preferenze si possono dare, l'eventuale data di chiusura, la spiegazione della ricevuta e l'avvertenza che il messaggio **si può inoltrare** a un'altra persona della società — il voto è identificato dal codice, non da chi lo usa, e vale una volta sola.
 
-Si rigenera da **🗳️ Votazione → Messaggi ai votanti → Prepara i messaggi**, e da solo ogni volta che i codici cambiano o che azzeri qualcosa. Per il round 2 lancialo dopo *Prepara commissari e link*: i destinatari diventano i commissari eletti.
+**La riga c'è per tutti**, anche per chi non ha un indirizzo email: quei messaggi si mandano per chat o a voce, e il testo è lì pronto da copiare. A fine preparazione il programma ti dice chi è rimasto senza indirizzo.
+
+Si rigenera da **🗳️ Votazione → Messaggi ai votanti → Prepara i messaggi del round attivo**, e da solo ogni volta che i codici cambiano o che azzeri qualcosa.
+
+Per i round 2 e 3 ci sono due voci apposta — **Prepara i messaggi per il Presidente** e **per il Vice** — che funzionano anche a round chiuso, dopo *Prepara commissari e link*: così i messaggi sono pronti prima di aprire. I destinatari diventano i commissari eletti, e il foglio si ricorda per quale round è stato preparato, quindi l'invio manda la cosa giusta anche se il round attivo è un altro.
 
 ### Le email
 
-Gli indirizzi stanno nella colonna **Email** del foglio *Società*. Puoi scriverli anche direttamente nel foglio *Messaggi*: alla rigenerazione successiva vengono ricopiati in *Società*, dove restano (il foglio *Messaggi* si riscrive da capo ogni volta).
+Gli indirizzi stanno nella colonna **Email**: nel foglio *Società* per le società, nel foglio *Commissari* per i commissari (round 2 e 3). Puoi scriverli anche direttamente nel foglio *Messaggi*: alla rigenerazione successiva vengono ricopiati in *Società*, dove restano (il foglio *Messaggi* si riscrive da capo ogni volta).
 
 **Più indirizzi per la stessa società** si scrivono nella stessa cella separati da virgola (o punto e virgola): una società ha spesso due referenti. Il messaggio arriva a tutti insieme, in una mail sola, e la scheda resta comunque una — il codice si usa una volta, chiunque dei due lo apra. Prima di mandare, l'avviso ti dice quali società hanno più di un indirizzo. Un indirizzo scritto male in mezzo agli altri non blocca gli altri: viene elencato a parte come da sistemare.
 
 Con un indirizzo presente hai due strade.
 
-**Apri la mail già scritta** — l'ultima colonna. È un link `mailto:` con destinatario, oggetto e testo compilati: apre il tuo programma di posta, non manda niente. Rileggi e spedisci tu. Un avvertimento: i programmi di posta **tagliano i `mailto:` troppo lunghi**, e il nostro testo è lungo. Il limite cambia da client a client; se il corpo arriva troncato, usa la via qui sotto.
-
 **Invia per email a chi ha l'indirizzo…** — nel sottomenu *Messaggi ai votanti*. Manda un messaggio per votante **dal tuo account Google**, uno alla volta e senza copia conoscenza, perché ogni link è personale. Come mittente i votanti vedono *Sezione Territoriale Baskin EISI* seguito dalla Sezione; si cambia in *Config → Mittente email*, e l'indirizzo di posta resta comunque quello del tuo account. Prima di partire ti dice chi riceverà, chi resta da avvisare a mano e quanta quota email ti resta per oggi. Gli indirizzi di prova (`@example.invalid` e simili) vengono saltati. A invio concluso controlla la posta inviata: quello che vedi lì è esattamente quello che hanno ricevuto.
+
+**Rimanda le email spuntate…** — quando qualcuno dice di non aver ricevuto niente. Metti la spunta nella colonna **Rimanda** del foglio *Messaggi*, sulle righe che ti interessano, e lancia la voce: parte solo a quelli. A invio fatto le spunte si tolgono da sole, così non si rimanda due volte per distrazione.
 
 ### L'avviso automatico all'apertura
 
@@ -144,6 +148,22 @@ In coda ci sono **Email** (vedi sopra) e **Codice affiliazione**: quest'ultimo s
 
 Il nome breve è quello che vedono i votanti: compare nei messaggi, sulla pagina di voto ("stai votando per…"), nel Riepilogo urna, nel Report e nei fogli dei ballottaggi. All'inizializzazione parte uguale alla ragione sociale, quindi finché non lo accorci non cambia niente; se lo lasci vuoto il programma usa comunque la ragione sociale.
 
+
+## Dopo aver aggiornato il codice
+
+Tre passaggi, e il secondo è quello che si dimentica.
+
+1. **Salva** `Code.gs` e `Index.html` nell'editor.
+2. **Distribuisci → Gestisci distribuzioni → matita → Versione: Nuova versione → Distribuisci.** L'URL `/exec` resta lo stesso. Salvare non basta: il menu del foglio usa il codice salvato, ma la pagina di voto passa dal ponte `/exec`, che serve la **versione distribuita**. Finché non ridistribuisci, la pagina continua a comportarsi come la versione precedente — e lo dichiara, scrivendo in fondo il numero di versione vecchio.
+3. **Ricarica il foglio** e lancia **Inizializza / aggiorna fogli**, che aggiunge le colonne nuove e rigenera Report, Riepilogo urna e Messaggi.
+
+Per controllare: *Interfaccia di voto → Mostra interfaccia attiva e indirizzi* ti dice la versione del codice salvato; in fondo alla pagina di voto c'è quella servita dal ponte. Devono coincidere. Se non coincidono, o non hai ridistribuito, oppure la pagina punta a una distribuzione diversa da quella che hai aggiornato — in *Gestisci distribuzioni* controlla che l'URL sia quello che hai messo nella pagina.
+
+## Stampare Report e Riepilogo urna
+
+I due fogli sono formattati per stare in un **A4 verticale**: quattro colonne di larghezza fissa, 660 pixel in tutto, con il testo che va a capo invece di allargare la colonna. Prima, con le colonne ridimensionate automaticamente, una riga lunga — l'elenco di chi non ha votato, una scheda con sei preferenze — allargava tutto e la stampa finiva su due pagine affiancate.
+
+Nel dialogo di stampa scegli **Foglio corrente**, formato **A4**, orientamento **Verticale** e scala **Normale (100%)**. Se aggiungi tu delle colonne o allarghi le esistenti, il conto non torna più: il programma rimette le larghezze a posto ogni volta che rigenera i fogli.
 
 ## Logo
 

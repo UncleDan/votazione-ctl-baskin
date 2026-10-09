@@ -1,6 +1,6 @@
 /**
  * Votazione CTL Baskin — voto online anonimo, un voto per società
- * v21 — Google Apps Script legato a un Foglio Google
+ * v22 — Google Apps Script legato a un Foglio Google
  *
  * Codice sorgente: https://github.com/UncleDan/votazione-ctl-baskin
  * Copyright (c) 2026 Daniele Lolli (UncleDan) — Licenza MIT (vedi LICENSE)
@@ -35,12 +35,13 @@ const SH = {
   MSG: 'Messaggi'
 };
 const REPO_URL = 'https://github.com/UncleDan/votazione-ctl-baskin';
-const VERSIONE = 'v21';
+const VERSIONE = 'v22';
 const LOGO_SVG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg';
 const LOGO_PNG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png';
 const PROPRIETA_LOGO = 'Logo © Ente Italiano Sport Inclusivi (EISI), tutti i diritti riservati';
 const P_SALT = 'SALT';
 const P_AVVISO = 'AVVISO_APERTURA';   // una sola mail di apertura per contesto
+const P_MSG = 'MSG_CTX';              // per quale round e preparato il foglio "Messaggi"
 const MAX_BALLOTTAGGI = 3;
 const ROUND = {
   1: { nome: 'Commissari CTL', ballots: 'BALLOTS', used: 'USED', ric: 'RIC', prefisso: 'Stai votando per la società: ' },
@@ -50,10 +51,10 @@ const ROUND = {
 const SOC_HEADER = ['Società', 'Codice', 'Link diretto di voto', 'Ha votato', 'Nome breve', 'Email', 'Codice affiliazione'];
 const SQ_HEADER = ['Squadra', 'Società'];
 const CAND_HEADER = ['Candidato', 'Qualifica', 'Squadra', 'Anni tesseramento/incarichi (spareggio)', 'Note'];
-const COM_HEADER = ['Commissario', 'Qualifica', 'Squadra', 'Codice', 'Link diretto di voto', 'Votato Presidente', 'Votato Vice'];
+const COM_HEADER = ['Commissario', 'Qualifica', 'Squadra', 'Codice', 'Link diretto di voto', 'Votato Presidente', 'Votato Vice', 'Email'];
 const BAL_HEADER = ['Votante', 'Codice ballottaggio', 'Link diretto di voto', 'Ha votato'];
 const RIS_HEADER = ['Posizione', 'Candidato', 'Qualifica', 'Squadra', 'Preferenze', 'Anni (spareggio)', 'Esito', 'Note'];
-const MSG_HEADER = ['Destinatario', 'Codice', 'Email', 'Messaggio da copiare e incollare', 'Apri la mail già scritta'];
+const MSG_HEADER = ['Destinatario', 'Codice', 'Email', 'Messaggio da copiare e incollare', 'Rimanda'];
 const LETTERE = 'ABCDEFGH';      // codici: 4 lettere A–H
 const CIFRE = '0123456789';      // + 4 cifre, nel formato XXXX-9999
 const FUSO = 'Europe/Rome';
@@ -102,8 +103,12 @@ function onOpen() {
       .addItem('Mostra pianificazione', 'mostraPianificazione')
       .addItem('Annulla pianificazione', 'annullaPianificazione'))
     .addSubMenu(ui.createMenu('Messaggi ai votanti')
-      .addItem('Prepara i messaggi', 'preparaMessaggiMenu')
-      .addItem('Invia per email a chi ha l\'indirizzo…', 'inviaMessaggiEmail'))
+      .addItem('Prepara i messaggi del round attivo', 'preparaMessaggiMenu')
+      .addItem('Prepara i messaggi per il Presidente', 'messaggiPresidente')
+      .addItem('Prepara i messaggi per il Vice', 'messaggiVice')
+      .addSeparator()
+      .addItem('Invia per email a chi ha l\'indirizzo…', 'inviaMessaggiEmail')
+      .addItem('Rimanda le email spuntate…', 'rimandaMessaggiEmail'))
     .addSubMenu(ui.createMenu('Interfaccia di voto')
       .addItem('Usa la app Google (semplice)', 'usaInterfacciaSemplice')
       .addItem('Usa la pagina web (HTML)…', 'usaInterfacciaHtml')
@@ -219,7 +224,7 @@ function setup() {
     cand.insertColumnsAfter(1, 2);
     cand.getRange(1, 2, 1, 2).setValues([['Qualifica', 'Squadra']]).setFontWeight('bold').setBackground(BLU);
   }
-  ensureSheet_(ss, SH.COM, COM_HEADER);
+  assicuraIntestazione_(ensureSheet_(ss, SH.COM, COM_HEADER), COM_HEADER);
   ensureSheet_(ss, SH.RIS, RIS_HEADER);
   ensureSheet_(ss, SH.MSG, MSG_HEADER);
   const brevi = riempiNomiBrevi_();
@@ -238,11 +243,18 @@ function setup() {
   if (!props.getProperty(P_SALT)) props.setProperty(P_SALT, Utilities.getUuid());
   const nuovi = assegnaCodiciMancanti_();   // codici univoci XXXX-9999 a chi non ne ha
   if (nuovi) avvisi.push(nuovi + ' società senza codice: codice e link assegnati ora.');
+  // Report, Riepilogo urna e Messaggi non si aggiornano da soli: la loro
+  // impaginazione (e le colonne nuove) nascono quando vengono riscritti, quindi
+  // li si rifa qui. Senza questo, dopo un aggiornamento di versione i fogli
+  // restano com'erano e sembra che il programma non sia cambiato.
+  dopoAzzeramento_();
   ui_().alert(
     'Fogli pronti.\n\n1) "Società": una riga per società (una riga = un voto).\n' +
     '2) "Squadre": squadra e società di appartenenza.\n' +
     '3) "Candidati": nome, qualifica, squadra, anni.\n' +
-    '4) Round 1 → "Genera codici e link mancanti".' + (avvisi.length ? '\n\n' + avvisi.join('\n\n') : ''));
+    '4) Round 1 → "Genera codici e link mancanti".\n\n' +
+    'Report, Riepilogo urna e Messaggi sono stati rigenerati con questa versione (' + VERSIONE + ').' +
+    (avvisi.length ? '\n\n' + avvisi.join('\n\n') : ''));
 }
 
 /**
@@ -520,45 +532,104 @@ function aggiornaLink_() {
 
 /* ================= Messaggi per i votanti ================= */
 
-function preparaMessaggiMenu() {
-  const n = preparaMessaggi();
-  ui_().alert(n
-    ? n + ' messaggi pronti nel foglio "Messaggi".\n\nUna riga per votante: copia la cella "Messaggio da copiare ' +
-      'e incollare" e incollala nella chat. Il link dentro il messaggio e gia quello personale.\n\n' +
-      'Se nella colonna "Email" c\'e un indirizzo, l\'ultima colonna porta un link che apre la mail con ' +
-      'destinatario, oggetto e testo gia scritti: resta da rileggerla e mandarla. Gli indirizzi scritti qui ' +
-      'vengono ricopiati nel foglio "Societa", cosi non si perdono quando i messaggi si rifanno.'
+function preparaMessaggiMenu() { preparaMessaggiRound_(0); }
+function messaggiPresidente() { preparaMessaggiRound_(2); }
+function messaggiVice() { preparaMessaggiRound_(3); }
+
+/**
+ * Prepara il foglio "Messaggi". Con r = 0 vale il round attivo (col suo
+ * eventuale ballottaggio); con r = 2 o 3 si preparano i messaggi del Presidente
+ * o del Vice anche a votazione chiusa, per averli pronti prima di aprire.
+ */
+function preparaMessaggiRound_(r) {
+  const ui = ui_();
+  const n = preparaMessaggi(r);
+  if (!n) return ui.alert(r
+    ? 'I commissari non hanno ancora codici: usa "Round 2 → Prepara commissari e link".'
     : 'Nessun votante per il round attivo: genera prima i codici (o prepara i commissari).');
+  const senza = msgSenzaEmail_();
+  ui.alert(n + ' messaggi pronti nel foglio "Messaggi"' + (r ? ' per ' + ROUND[r].nome : '') + '.\n\n' +
+    'Una riga per votante: copia la cella "Messaggio da copiare e incollare" e incollala dove ti serve. ' +
+    'Il link dentro il messaggio e gia quello personale.\n\n' +
+    'Il messaggio c\'e per tutti, anche per chi non ha un indirizzo email: quelli si mandano per chat o per telefono.' +
+    (senza.length ? '\n\nSenza indirizzo email (' + senza.length + '): ' + senza.join(', ') : '') +
+    '\n\nPer rimandare una mail a qualcuno, spunta la casella "Rimanda" sulla sua riga e usa ' +
+    '"Messaggi ai votanti → Rimanda le email spuntate".');
 }
 
-/** Codice normalizzato -> email, dal foglio "Societa" (l'unico posto dove resta). */
-function emailMap_() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(SH.SOC);
-  const m = {};
-  if (!sh || sh.getLastRow() < 2 || sh.getLastColumn() < 6) return m;
-  sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues()
-    .forEach(r => { const k = norm_(r[1]), e = String(r[5]).trim(); if (k && e) m[k] = e; });
+/** Il contesto per cui e stato preparato l'ultimo foglio "Messaggi" ("r-b"). */
+function msgContesto_() {
+  const v = String(PropertiesService.getScriptProperties().getProperty(P_MSG) || '').split('-');
+  const r = parseInt(v[0], 10), b = parseInt(v[1], 10);
+  return ROUND[r] ? { r: r, b: b > 0 ? b : 0 } : null;
+}
+
+/** Destinatari del foglio "Messaggi" rimasti senza indirizzo. */
+function msgSenzaEmail_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(SH.MSG);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues()
+    .filter(r => String(r[0]).trim() && !String(r[2]).trim()).map(r => String(r[0]).trim());
+}
+
+/**
+ * Nome del votante -> email. Le societa hanno la loro colonna nel foglio
+ * "Societa", i commissari nel foglio "Commissari": si cerca per nome e non per
+ * codice, perche nei ballottaggi i codici cambiano mentre i nomi no.
+ */
+function emailPerNome_() {
+  const ss = SpreadsheetApp.getActive(), m = {};
+  const soc = ss.getSheetByName(SH.SOC);
+  if (soc && soc.getLastRow() > 1 && soc.getLastColumn() >= 6) {
+    const brevi = nomiBrevi_();
+    soc.getRange(2, 1, soc.getLastRow() - 1, 6).getValues().forEach(r => {
+      const rag = String(r[0]).trim(), e = String(r[5]).trim();
+      if (rag && e) m[brevi[rag] || rag] = e;
+    });
+  }
+  const com = ss.getSheetByName(SH.COM);
+  if (com && com.getLastRow() > 1 && com.getLastColumn() >= 8) {
+    com.getRange(2, 1, com.getLastRow() - 1, 8).getValues().forEach(r => {
+      const nome = String(r[0]).trim(), e = String(r[7]).trim();
+      if (nome && e) m[nome] = e;
+    });
+  }
   return m;
 }
 
 /**
  * Il foglio "Messaggi" si rifa da capo ogni volta, quindi un indirizzo scritto
- * li dentro andrebbe perso: prima di riscriverlo lo si travasa nel foglio
- * "Societa", dove resta. Cosi l'indirizzo si puo scrivere in entrambi i posti.
+ * li dentro andrebbe perso: prima di riscriverlo lo si travasa dove resta, cioe
+ * nel foglio "Societa" per le societa e in "Commissari" per i commissari.
  */
 function assorbiEmailMessaggi_() {
   const ss = SpreadsheetApp.getActive();
-  const msg = ss.getSheetByName(SH.MSG), soc = ss.getSheetByName(SH.SOC);
-  if (!msg || !soc || msg.getLastRow() < 2 || msg.getLastColumn() < 3 || soc.getLastRow() < 2) return 0;
+  const msg = ss.getSheetByName(SH.MSG);
+  if (!msg || msg.getLastRow() < 2 || msg.getLastColumn() < 3) return 0;
   const m = {};
   msg.getRange(2, 1, msg.getLastRow() - 1, 3).getValues()
-    .forEach(r => { const k = norm_(r[1]), e = String(r[2]).trim(); if (k && e.indexOf('@') > 0) m[k] = e; });
+    .forEach(r => { const n = String(r[0]).trim(), e = String(r[2]).trim(); if (n && e.indexOf('@') > 0) m[n] = e; });
   if (!Object.keys(m).length) return 0;
-  const n = soc.getLastRow() - 1;
-  const v = soc.getRange(2, 1, n, 6).getValues();
   let q = 0;
-  v.forEach(r => { const e = m[norm_(r[1])]; if (e && !String(r[5]).trim()) { r[5] = e; q++; } });
-  if (q) soc.getRange(2, 1, n, 6).setValues(v);
+  const soc = ss.getSheetByName(SH.SOC);
+  if (soc && soc.getLastRow() > 1) {
+    const brevi = nomiBrevi_(), n = soc.getLastRow() - 1;
+    const v = soc.getRange(2, 1, n, 6).getValues();
+    v.forEach(r => {
+      const rag = String(r[0]).trim();
+      const e = m[brevi[rag] || rag];
+      if (e && !String(r[5]).trim()) { r[5] = e; q++; }
+    });
+    if (q) soc.getRange(2, 1, n, 6).setValues(v);
+  }
+  const com = ss.getSheetByName(SH.COM);
+  if (com && com.getLastRow() > 1) {
+    const n = com.getLastRow() - 1;
+    const v = com.getRange(2, 1, n, COM_HEADER.length).getValues();
+    let qc = 0;
+    v.forEach(r => { const e = m[String(r[0]).trim()]; if (e && !String(r[7]).trim()) { r[7] = e; qc++; } });
+    if (qc) { com.getRange(2, 1, n, COM_HEADER.length).setValues(v); q += qc; }
+  }
   return q;
 }
 
@@ -572,21 +643,29 @@ function avvisaAperturaEmail_(c, x) {
   const props = PropertiesService.getScriptProperties();
   const chiave = P_AVVISO + '_' + x.r + '_' + x.b;
   if (props.getProperty(chiave)) return { gia: true, fatte: 0, senza: [], errori: [] };
-  const map = votantiMap_(x.r, x.b);
-  const mail = emailMap_();
-  const oggetto = oggettoApertura_(c, x);
+  const esito = spedisci_(c, x, votantiMap_(x.r, x.b), oggettoApertura_(c, x), testoApertura_);
+  if (esito.fatte) props.setProperty(chiave, new Date().toISOString());
+  return { gia: false, fatte: esito.fatte, senza: esito.senza, errori: esito.errori };
+}
+
+/**
+ * Manda un messaggio per votante, con il suo link dentro. Niente copia
+ * conoscenza e niente invii cumulativi: il link e personale. Una societa con
+ * piu indirizzi riceve una mail sola indirizzata a tutti i suoi referenti.
+ */
+function spedisci_(c, x, map, oggetto, testo) {
+  const mail = emailPerNome_();
   const mittente = mittente_(c);
   const fatte = [], senza = [], errori = [];
   Object.keys(map).sort((a, b) => map[a].localeCompare(map[b], 'it')).forEach(k => {
-    const v = vaglia_(mail[k]);
+    const v = vaglia_(mail[map[k]]);
     if (!v.buoni.length) return senza.push(map[k] + (v.sbagliati.length ? ' (non valido: ' + v.sbagliati.join(', ') + ')' : ''));
     try {
-      MailApp.sendEmail({ to: v.buoni.join(','), subject: oggetto, body: testoApertura_(c, x, map[k], k), name: mittente });
+      MailApp.sendEmail({ to: v.buoni.join(','), subject: oggetto, body: testo(c, x, map[k], k), name: mittente });
       fatte.push(map[k]);
     } catch (err) { errori.push(map[k] + ': ' + ((err && err.message) || err)); }
   });
-  if (fatte.length) props.setProperty(chiave, new Date().toISOString());
-  return { gia: false, fatte: fatte.length, senza: senza, errori: errori };
+  return { fatte: fatte.length, nomi: fatte, senza: senza, errori: errori };
 }
 
 /** Riassunto dell'avviso di apertura, da attaccare al messaggio del menu. */
@@ -621,25 +700,6 @@ function oggettoMessaggio_(c, x) {
     (x.b ? ' — ballottaggio: il link per votare' : ' — il link per votare');
 }
 
-/**
- * Link che apre il programma di posta con destinatario, oggetto e testo gia
- * scritti. Non spedisce niente: la mail si apre, si rilegge e si manda a mano.
- * Attenzione alla lunghezza: i client tagliano gli indirizzi mailto oltre un
- * limite che cambia da programma a programma (fra i 2000 e i 4000 caratteri),
- * e il nostro testo e lungo. Se il corpo arriva troncato, si usa l'invio
- * diretto dal menu, che non ha questo limite.
- */
-function mailtoFormula_(email, oggetto, testo) {
-  const v = vaglia_(email);
-  // qui entrano anche i domini di prova: il link apre la mail, non la manda,
-  // quindi con i dati finti si puo vedere com'e fatta senza spedire niente
-  const a = v.buoni.concat(v.finti);
-  if (!a.length) return '';
-  const url = 'mailto:' + a.map(x => encodeURIComponent(x).replace(/%40/g, '@')).join(',') +
-    '?subject=' + encodeURIComponent(oggetto) + '&body=' + encodeURIComponent(testo);
-  return '=HYPERLINK("' + url.replace(/"/g, '%22') + '","✉ Apri la mail")';
-}
-
 /** Indirizzo singolo scrivibile: forma plausibile e non un dominio riservato alle prove. */
 function emailBuona_(e) {
   const s = String(e).trim();
@@ -672,39 +732,61 @@ function vaglia_(cella) {
   return r;
 }
 
+/** Manda il messaggio a tutti i votanti del foglio "Messaggi" che hanno un indirizzo. */
+function inviaMessaggiEmail() { inviaDaMessaggi_(false); }
+
+/** Rimanda il messaggio solo alle righe con la casella "Rimanda" spuntata. */
+function rimandaMessaggiEmail() { inviaDaMessaggi_(true); }
+
 /**
- * Manda i messaggi per email dall'account che ha il foglio aperto: una mail per
- * votante, con il suo link dentro. Niente copia conoscenza e niente invii
- * multipli nello stesso messaggio: il link e personale e non va in giro.
+ * Manda (o rimanda) le email partendo dal foglio "Messaggi", non dal round
+ * attivo: cosi si possono preparare i messaggi del Presidente e mandarli prima
+ * di aprire quel round. Con solo = true parte solo alle righe spuntate, che e
+ * il modo per rimandare a chi dice di non aver ricevuto niente.
  */
-function inviaMessaggiEmail() {
+function inviaDaMessaggi_(solo) {
   const ui = ui_(), c = cfg_();
-  const x = contesto_(c);
-  if (x.errore) return ui.alert('Votazione non disponibile: ' + x.errore);
-  const map = votantiMap_(x.r, x.b);
-  if (!Object.keys(map).length) return ui.alert('Nessun votante per il round attivo: genera prima i codici.');
-  assorbiEmailMessaggi_();
-  const mail = emailMap_();
-  const con = [], senza = [], finti = [];
-  Object.keys(map).sort((a, b) => map[a].localeCompare(map[b], 'it')).forEach(k => {
-    const v = vaglia_(mail[k]);
-    if (v.sbagliati.length) senza.push(map[k] + ' (non valido: ' + v.sbagliati.join(', ') + ')');
-    if (v.buoni.length) return con.push({ k: k, nome: map[k], email: v.buoni.join(','), quanti: v.buoni.length });
-    if (v.finti.length) return finti.push(map[k]);
-    if (!v.sbagliati.length) senza.push(map[k]);
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(SH.MSG);
+  if (!sh || sh.getLastRow() < 2) return ui.alert('Il foglio "Messaggi" è vuoto: preparali prima.');
+  const ctx = msgContesto_();
+  if (!ctx) return ui.alert('Non so per quale round sono questi messaggi: rifalli con "Prepara i messaggi".');
+  const x = contestoRound_(ctx.r, c, ctx.b);
+  if (x.errore) return ui.alert('Votazione non disponibile per questi messaggi: rifalli con "Prepara i messaggi".');
+  const map = votantiMap_(ctx.r, ctx.b);
+  const nomi = {};
+  Object.keys(map).forEach(k => nomi[map[k]] = k);
+
+  const righe = sh.getRange(2, 1, sh.getLastRow() - 1, MSG_HEADER.length).getValues()
+    .filter(r => String(r[0]).trim() && (!solo || r[4] === true));
+  if (!righe.length) return ui.alert(solo
+    ? 'Nessuna riga spuntata: metti la spunta nella colonna "Rimanda" di chi vuoi riavvisare, poi riprova.'
+    : 'Nessun destinatario nel foglio "Messaggi".');
+
+  const con = [], senza = [], finti = [], ignoti = [];
+  righe.forEach(r => {
+    const nome = String(r[0]).trim();
+    const k = nomi[nome];
+    if (!k) return ignoti.push(nome);
+    const v = vaglia_(r[2]);
+    if (v.sbagliati.length) senza.push(nome + ' (non valido: ' + v.sbagliati.join(', ') + ')');
+    if (v.buoni.length) return con.push({ k: k, nome: nome, email: v.buoni.join(','), quanti: v.buoni.length });
+    if (v.finti.length) return finti.push(nome);
+    if (!v.sbagliati.length) senza.push(nome);
   });
   const restano = (senza.length ? '\n\nSenza indirizzo valido, da mandare a mano: ' + senza.join(', ') : '') +
-    (finti.length ? '\n\nIndirizzi di prova, li salto: ' + finti.join(', ') : '');
+    (finti.length ? '\n\nIndirizzi di prova, li salto: ' + finti.join(', ') : '') +
+    (ignoti.length ? '\n\nNon sono più fra i votanti di questo round, li salto: ' + ignoti.join(', ') : '');
   if (!con.length) return ui.alert('Nessun indirizzo a cui scrivere',
-    'Scrivi le email nel foglio "Societa" (colonna "Email") oppure nel foglio "Messaggi", poi riprova.' + restano,
-    ui.ButtonSet.OK);
+    'Scrivi le email nella colonna "Email" del foglio "Messaggi" (oppure in "Società" / "Commissari"), poi ' +
+    'rifai i messaggi e riprova.' + restano, ui.ButtonSet.OK);
   let quota = 0;
   try { quota = MailApp.getRemainingDailyQuota(); } catch (e) { quota = con.length; }
   if (quota < con.length) return ui.alert('Quota email insufficiente',
     'Da mandare: ' + con.length + '. Restano per oggi: ' + quota + '.\n\nRiprova domani, oppure manda a mano i messaggi ' +
     'dal foglio "Messaggi".', ui.ButtonSet.OK);
   const oggetto = oggettoMessaggio_(c, x);
-  if (ui.alert('Invio delle email',
+  if (ui.alert(solo ? 'Rimando le email spuntate' : 'Invio delle email',
     'Mando ' + con.length + ' email dal tuo account Google, una per votante, con oggetto:\n' + oggetto +
     (con.some(v => v.quanti > 1) ? '\n\nQualcuno ha piu di un indirizzo: a quelle societa il messaggio arriva a tutti i ' +
       'referenti insieme (' + con.filter(v => v.quanti > 1).map(v => v.nome + ' ×' + v.quanti).join(', ') +
@@ -721,39 +803,50 @@ function inviaMessaggiEmail() {
       fatte++;
     } catch (err) { errori.push(v.nome + ': ' + ((err && err.message) || err)); }
   });
+  if (solo) togliSpunte_();
   ui.alert(fatte + ' email inviate.' + restano +
     (errori.length ? '\n\nNon partite: ' + errori.join('\n') : '') +
+    (solo && fatte ? '\n\nLe spunte "Rimanda" sono state tolte.' : '') +
     '\n\nControlla la posta inviata: quello che vedi li e esattamente quello che hanno ricevuto.');
 }
 
+/** Dopo un rinvio le spunte si tolgono, cosi non si rimanda due volte per sbaglio. */
+function togliSpunte_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(SH.MSG);
+  if (!sh || sh.getLastRow() < 2) return;
+  const n = sh.getLastRow() - 1;
+  sh.getRange(2, 5, n, 1).setValues(Array.from({ length: n }, () => [false]));
+}
+
 /**
- * Prepara il foglio "Messaggi": una riga per votante del round attivo, con il
- * testo gia pronto in una sola cella. Si copia la cella e si incolla nella chat
- * della societa, senza doverlo ricomporre ogni volta.
+ * Prepara il foglio "Messaggi": una riga per votante, con il testo gia pronto
+ * in una sola cella. Si copia la cella e la si incolla nella chat, senza doverlo
+ * ricomporre ogni volta. La riga c'e anche per chi non ha un indirizzo email:
+ * quel messaggio si manda per un altro canale.
  */
-function preparaMessaggi() {
+function preparaMessaggi(round) {
   const ss = SpreadsheetApp.getActive(), c = cfg_();
-  const x = contesto_(c);
-  const map = votantiMap_(x.r, x.b);
+  const r = ROUND[round] ? round : roundAttivo_(c);
+  const b = ROUND[round] ? 0 : ballottaggioAttivo_(c);
+  const x = contestoRound_(r, c, b);
+  const map = votantiMap_(r, b);
   assorbiEmailMessaggi_();
-  const mail = emailMap_();
+  const mail = emailPerNome_();
   const sh = svuotaFoglio_(ss, SH.MSG, MSG_HEADER);
-  const oggetto = oggettoMessaggio_(c, x);
-  const righe = Object.keys(map).sort((a, b) => map[a].localeCompare(map[b], 'it'))
-    .map(k => {
-      const testo = testoMessaggio_(c, x, map[k], k);
-      const e = String(mail[k] || '').trim();
-      return [map[k], formattaCodice_(k), e, testo, e ? mailtoFormula_(e, oggetto, testo) : ''];
-    });
+  const righe = Object.keys(map).sort((a, b2) => map[a].localeCompare(map[b2], 'it'))
+    .map(k => [map[k], formattaCodice_(k), String(mail[map[k]] || '').trim(), testoMessaggio_(c, x, map[k], k), false]);
   if (righe.length) {
     sh.getRange(2, 1, righe.length, MSG_HEADER.length).setValues(righe);
     sh.getRange(2, 4, righe.length, 1).setWrap(true).setVerticalAlignment('top');
+    sh.getRange(2, 5, righe.length, 1).setDataValidation(
+      SpreadsheetApp.newDataValidation().requireCheckbox().build());
+    sh.getRange(2, 5, righe.length, 1).setHorizontalAlignment('center');
   }
-  [220, 110, 230, 600, 170].forEach((w, i) => sh.setColumnWidth(i + 1, w));
+  [220, 110, 260, 600, 90].forEach((w, i) => sh.setColumnWidth(i + 1, w));
+  PropertiesService.getScriptProperties().setProperty(P_MSG, r + '-' + b);
   return righe.length;
 }
 
-/** Il codice come lo vede chi lo riceve: XXXX-9999. */
 function formattaCodice_(k) {
   const n = norm_(k);
   return n.length > 4 ? n.slice(0, 4) + '-' + n.slice(4) : n;
@@ -967,7 +1060,11 @@ function mostraInterfaccia() {
     'App Google: ' + (urlApp_() || 'non pubblicata') + '\n' +
     'Pagina web: ' + (urlHtml_(c) || 'non configurata') + '\n\n' +
     'Ponte per la pagina web: lo stesso indirizzo della app Google, chiamato in POST.\n' +
-    'Chi prova a votare dall\'ingresso non attivo riceve un rimando a quello giusto.',
+    'Chi prova a votare dall\'ingresso non attivo riceve un rimando a quello giusto.\n\n' +
+    'Versione di questo codice: ' + VERSIONE + '.\n' +
+    'In fondo alla pagina di voto deve comparire la stessa. Se la pagina ne mostra una più vecchia, ' +
+    'la web app non è stata ridistribuita: Distribuisci → Gestisci distribuzioni → matita → ' +
+    'Versione: Nuova versione → Distribuisci. Salvare il codice non basta: /exec serve la versione distribuita.',
     ui_().ButtonSet.OK);
 }
 
@@ -1050,13 +1147,13 @@ function preparaCommissari() {
   if (!eletti.length) { ui.alert('Nessun eletto in "Risultati".'); return false; }
 
   const sh = sheet_(SH.COM);
-  const vecchi = {};
+  const vecchi = {}, vecchieMail = emailCommissari_();
   commissari_().forEach(x => { if (x.codice) vecchi[x.nome] = x.codice; });
   const usati = codiciEsistenti_();
   const rows = eletti.map(r => {
     const nome = String(r[iN]).trim();
     const cod = vecchi[nome] || codiceNuovo_(usati);
-    return [nome, String(r[iQ]).trim(), String(r[iS]).trim(), cod, link_(cod), '', ''];
+    return [nome, String(r[iQ]).trim(), String(r[iS]).trim(), cod, link_(cod), '', '', vecchieMail[nome] || ''];
   });
   if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, COM_HEADER.length).clearContent();
   sh.getRange(2, 1, rows.length, COM_HEADER.length).setValues(rows);
@@ -1884,7 +1981,7 @@ function aggiornaReport() {
   sh.getRange(6 + o, 1, 5, 1).setFontWeight('bold');
   sh.getRange(headRow + o, 1, 1, 4).setFontWeight('bold').setBackground(BLU);
   scriviLinkRepo_(sh, rows.length + 2 + o);
-  sh.autoResizeColumns(1, 4);
+  formatoA4_(sh, rows.length + 2 + o, 4);
 }
 
 /* ================= Riepilogo per il custode dell'urna ================= */
@@ -1973,7 +2070,7 @@ function aggiornaUrna() {
   bold.forEach(i => sh.getRange(i + o, 1, 1, W).setFontWeight('bold'));
   head.forEach(i => sh.getRange(i + o, 1, 1, W).setFontWeight('bold').setBackground(BLU));
   scriviLinkRepo_(sh, rows.length + 1 + o);
-  sh.autoResizeColumns(1, W);
+  formatoA4_(sh, rows.length + 1 + o, W);
 }
 
 /* ================= Azzeramento ================= */
@@ -2213,6 +2310,20 @@ function doPost(e) {
 }
 
 /** Contesto di voto attivo: round, ballottaggio, candidati e massimo di preferenze. */
+/**
+ * Il contesto di un round scelto, non per forza quello attivo: serve per
+ * preparare i messaggi del Presidente o del Vice prima di aprire quel round.
+ */
+function contestoRound_(r, c, b) {
+  if (!ROUND[r]) return contesto_(c);
+  if (b) {
+    const att = contesto_(c);
+    if (att.r === r && att.b === b) return att;
+  }
+  const cand = candidatiRound_(r, c);
+  return { r: r, b: 0, cand: cand, max: maxPrefRound_(r, c, cand.length), st: null, id: r + '-0' };
+}
+
 function contesto_(c) {
   const r = roundAttivo_(c), b = ballottaggioAttivo_(c);
   let cand = candidatiRound_(r, c), max = maxPrefRound_(r, c, cand.length), st = null;
@@ -2432,6 +2543,35 @@ function altezzeRighe_(sh) {
   try { sh.setRowHeights(1, sh.getMaxRows(), 21); } catch (e) {}
 }
 
+/**
+ * Larghezze fisse e testo a capo, per stare in un A4 verticale.
+ * Il margine utile di un A4 in verticale e circa 17,5 cm, cioe poco meno di
+ * 660 pixel alla scala normale: con autoResizeColumns una riga lunga (l'elenco
+ * di chi non ha votato, una scheda con sei preferenze) allargava la colonna
+ * all'infinito e la stampa finiva su due pagine in orizzontale. Con larghezze
+ * fisse e il testo a capo la pagina cresce in altezza, che in stampa va bene.
+ * Le righe tornano ad altezza automatica, altrimenti il testo a capo verrebbe
+ * tagliato a 21 pixel.
+ */
+const A4_LARGHEZZE = [180, 110, 250, 120];   // 660 px in tutto
+
+function formatoA4_(sh, righe, colonne) {
+  A4_LARGHEZZE.slice(0, colonne).forEach((w, i) => sh.setColumnWidth(i + 1, w));
+  const n = Math.min(righe + 4, sh.getMaxRows());
+  const blocco = sh.getRange(1, 1, n, colonne);
+  try { blocco.breakApart(); } catch (e) {}
+  blocco.setWrap(true).setVerticalAlignment('top');
+  // Titoli, note e piede occupano la sola prima cella: senza unirli il testo a
+  // capo li incolonnerebbe dentro 180 pixel. Uniti, usano tutta la larghezza.
+  const v = blocco.getValues();
+  v.forEach((r, i) => {
+    if (String(r[0]).trim() === '') return;
+    for (let j = 1; j < colonne; j++) if (String(r[j]).trim() !== '') return;
+    try { sh.getRange(i + 1, 1, 1, colonne).merge(); } catch (e) {}
+  });
+  try { sh.autoResizeRows(1, n); } catch (e) {}
+}
+
 function aperta_(c) { return String(c['Stato']).trim().toUpperCase() === 'APERTA'; }
 
 function roundAttivo_(c) {
@@ -2568,6 +2708,16 @@ function candidatiRound_(r, c) {
     com = com.filter(x => x.nome !== pres);
   }
   return com;
+}
+
+/** Nome del commissario -> email, dal foglio "Commissari". */
+function emailCommissari_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(SH.COM);
+  const m = {};
+  if (!sh || sh.getLastRow() < 2 || sh.getLastColumn() < 8) return m;
+  sh.getRange(2, 1, sh.getLastRow() - 1, 8).getValues()
+    .forEach(r => { const n = String(r[0]).trim(), e = String(r[7]).trim(); if (n && e) m[n] = e; });
+  return m;
 }
 
 function commissari_() {

@@ -27,14 +27,15 @@ Sheet.prototype = {
       setWrap() { return R; }, setVerticalAlignment() { return R; }, setHorizontalAlignment() { return R; },
       setDataValidation() { return R; }, setNumberFormat() { return R; },
       setFormula(f) { sh.cell(r, c)[c - 1] = f; return R; },
-      getRow() { return r; }, getColumn() { return c; }
+      getRow() { return r; }, getColumn() { return c; },
+      merge() { return R; }, breakApart() { return R; }
     };
     return R;
   },
   appendRow(a) { this.d.splice(this.getLastRow(), 0, a.slice()); },
   clearContents() { this.d = []; }, clear() { this.d = []; },
   insertColumnsAfter(c, n) { this.d.forEach(r => { while (r.length < c) r.push(''); r.splice(c, 0, ...Array(n).fill('')); }); },
-  setFrozenRows() {}, autoResizeColumns() {}, activate() {}, setRowHeight() {}, setRowHeights() {},
+  setFrozenRows() {}, autoResizeColumns() {}, autoResizeRows() {}, activate() {}, setRowHeight() {}, setRowHeights() {},
   setColumnWidth() {}, setColumnWidths() {}, hideColumns() {}
 };
 
@@ -58,7 +59,7 @@ global.SpreadsheetApp = {
   getActive: () => SS, getActiveSpreadsheet: () => SS,
   // con global.SENZA_UI si simula l'esecuzione da trigger a tempo (nessuna interfaccia)
   getUi: () => { if (global.SENZA_UI) throw new Error('Cannot call SpreadsheetApp.getUi() from this context.'); return UI; },
-  newDataValidation() { const b = { requireValueInList: () => b, requireValueInRange: () => b, requireTextIsEmail: () => b, setAllowInvalid: () => b, build: () => ({}) }; return b; },
+  newDataValidation() { const b = { requireValueInList: () => b, requireValueInRange: () => b, requireTextIsEmail: () => b, requireCheckbox: () => b, setAllowInvalid: () => b, build: () => ({}) }; return b; },
   newRichTextValue() { const o = {}; const b = { setText(t) { o.text = t; return b; }, setLinkUrl() { return b; }, build: () => o }; return b; }
 };
 global.PropertiesService = { getScriptProperties: () => ({
