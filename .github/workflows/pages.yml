@@ -30,6 +30,13 @@ jobs:
       # variabile PONTE del repository (Settings -> Secrets and variables ->
       # Actions -> Variables). Cosi quando ridistribuisci lo script e l'URL
       # cambia, aggiorni la variabile invece di modificare la pagina.
+      #
+      # Entra nella pagina codificato in base64. Non e cifratura: la pagina deve
+      # usarlo, quindi deve poterlo leggere, e chi apre gli strumenti per
+      # sviluppatori lo vede comunque nella prima chiamata. Serve solo a non
+      # lasciarlo in chiaro nel sorgente, dove lo raccoglierebbe qualunque
+      # crawler a caccia di endpoint Apps Script. Per lo stesso motivo il log di
+      # questo passo non lo stampa: su un repository pubblico il log e pubblico.
       - name: Inserisci l'indirizzo del ponte
         env:
           PONTE_URL: ${{ vars.PONTE }}
@@ -41,13 +48,17 @@ jobs:
             exit 0
           fi
           python3 - "$PONTE_URL" <<'PY'
-          import sys, pathlib
+          import sys, pathlib, base64
           p = pathlib.Path("scheda-html/index.html")
           t = p.read_text(encoding="utf-8")
           if "__PONTE__" not in t:
               sys.exit("Segnaposto __PONTE__ non trovato in scheda-html/index.html")
-          p.write_text(t.replace("__PONTE__", sys.argv[1]), encoding="utf-8")
-          print("Ponte inserito:", sys.argv[1])
+          url = sys.argv[1].strip()
+          if not url.startswith("https://"):
+              sys.exit("La variabile PONTE non e' un indirizzo https://")
+          b64 = base64.b64encode(url.encode("utf-8")).decode("ascii")
+          p.write_text(t.replace("__PONTE__", b64), encoding="utf-8")
+          print("Ponte inserito (base64, %d caratteri). L'indirizzo non viene stampato apposta." % len(b64))
           PY
 
       # Pages va acceso UNA VOLTA a mano, in Settings -> Pages -> Source: GitHub

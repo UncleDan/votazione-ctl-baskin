@@ -14,10 +14,12 @@ Funziona con un Foglio Google e Google Apps Script: nessun server da gestire, ne
 - **Codici** nel formato `XXXX-9999` (quattro lettere A–H e quattro cifre), generabili e rigenerabili senza azzerare società, squadre, candidati o voti già espressi.
 - **Formatore di riferimento** indicato senza votazione (votante solo se si candida, con `Autocandidatura` al posto della squadra).
 - **Tre azzeramenti**: *solo i risultati* (si rivota con gli stessi codici e gli stessi link), *tutto* (via anche società, squadre e candidati, per una nuova elezione) e *tutto più dati di prova*. Nessuno tocca la pubblicazione della app web, quindi lo stesso foglio e lo stesso indirizzo servono per tutte le votazioni successive e per quante prove vuoi.
-- **Dati di prova** con una voce di menu: società, squadre e candidati inventati negli stessi numeri di una Sezione Territoriale reale, per provare il giro completo senza toccare i dati veri.
+- **Una società, un solo candidato**: la regola è controllata, e il round 1 non si apre finché qualcuno ne presenta due. Gli autocandidati, non tesserati con nessun club, sono esclusi dal conteggio.
+- **Dati di prova** con una voce di menu: società, squadre e candidati inventati (città e personaggi Disney) negli stessi numeri di una Sezione Territoriale reale, per provare il giro completo senza toccare i dati veri.
 - **Ricevuta di voto**: a scheda depositata il votante riceve un codice casuale, da fotografare o trascrivere; a spoglio concluso lo ritrova nel Riepilogo urna e sa che la sua scheda è stata contata, senza che la ricevuta riveli come ha votato.
 - **Ragione sociale e nome breve**: la prima resta per gli atti, il secondo è quello che vedono i votanti nei messaggi, sulla scheda e nei resoconti.
-- **Messaggi pronti**: un foglio con una riga per votante e il testo da copiare e incollare nella chat, link personale e spiegazioni comprese.
+- **Messaggi pronti**: un foglio con una riga per votante e il testo da copiare e incollare nella chat, link personale e spiegazioni comprese — fra cui che il messaggio si può inoltrare a un'altra persona della società, perché è il codice a identificare il voto.
+- **Email**: accanto a ogni messaggio un link che apre la mail già scritta, e una voce di menu che le manda tutte dal proprio account Google, una per votante e senza copia conoscenza. **All'apertura della votazione l'avviso parte da solo**, con dentro il link personale e la data di chiusura.
 - **Freno sui tentativi**: tre codici sbagliati e il voto da quel dispositivo si sospende per un'ora, con una memoria tecnica del browser che non traccia nulla.
 - **Report** finale e **Riepilogo urna** per il custode, con controllo di coerenza e schede anonime per il riconteggio.
 - **Sezione Territoriale** e **anno sportivo** sulla pagina di voto e nei report.

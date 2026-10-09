@@ -20,7 +20,17 @@
   button.sec { background:transparent; color:var(--accent); border:2px solid var(--accent); }
   button:disabled { opacity:.5; cursor:default; }
   .msg { font:15px system-ui, sans-serif; color:var(--err); margin-top:10px; min-height:1em; }
-  .cont { position:sticky; top:0; background:var(--paper); padding:8px 0; font:600 15px system-ui, sans-serif; border-bottom:1px solid var(--line); margin-bottom:6px; z-index:1; }
+  /* contatore delle preferenze: molti non sanno di poterne dare più di una, quindi grande e riquadrato */
+  .cont { position:sticky; top:0; background:var(--paper); padding:10px 0 8px; border-bottom:1px solid var(--line); margin-bottom:6px; z-index:1; }
+  .cont-b { display:inline-block; border:2px solid var(--accent); border-radius:8px; background:#eef3fb; padding:7px 13px 6px; text-align:center; }
+  .cont-b.full { border-color:var(--ok); background:#eaf4ee; }
+  .cont-n { display:block; font:700 clamp(26px,8vw,34px)/1 ui-monospace, Menlo, monospace; color:var(--accent); }
+  .cont-b.full .cont-n { color:var(--ok); }
+  .cont-l { display:block; font:600 10px system-ui, sans-serif; letter-spacing:1.1px; text-transform:uppercase; color:var(--muted); margin-top:3px; }
+  /* per chi si sta votando: è il controllo che il codice sia quello giusto */
+  .votante { margin:0 0 14px; padding:10px 13px; background:#fff; border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:0 6px 6px 0; }
+  .votante b { display:block; font:600 11px system-ui, sans-serif; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent); margin-bottom:3px; }
+  .votante i { display:block; font:600 clamp(20px,5.5vw,26px)/1.2 system-ui, sans-serif; font-style:normal; color:var(--ink); }
   .cand { display:flex; align-items:center; gap:14px; padding:14px 6px; border-bottom:1px dashed var(--line); cursor:pointer; }
   .cand input { width:26px; height:26px; accent-color:var(--accent); flex:none; }
   .cand.off { opacity:.45; }
@@ -61,10 +71,10 @@
     </section>
 
     <section id="s-vote" hidden>
-      <p id="soc"></p>
+      <p class="votante" id="soc" hidden></p>
       <p id="messaggio"></p>
       <p class="note" id="deroga" hidden></p>
-      <div class="cont" id="contatore"></div>
+      <div class="cont"><span class="cont-b" id="cont-box"><span class="cont-n"><span id="cont-n">0</span>/<span id="cont-max">0</span></span><span class="cont-l" id="cont-l">preferenze</span></span></div>
       <div id="lista"></div>
       <button id="b-riepilogo">Rivedi la scheda</button>
     </section>
@@ -123,7 +133,7 @@
     var f = tentBloccoFino();
     $('b-verifica').disabled = !!f;
     if (f) $('m-code').textContent = 'Codice sbagliato tre volte: per sicurezza il voto da questo dispositivo ' +
-      'riprende fra ' + tentMinuti(f) + ' minuti. Se non trovi il codice, chiedilo al Coordinatore della Sezione Tecnica.';
+      'riprende fra ' + tentMinuti(f) + ' minuti. Se non trovi il codice, chiedilo al Coordinatore della Sezione Territoriale.';
     return !!f;
   }
 
@@ -174,7 +184,7 @@
         }
         tentAzzera();
         CODE = c;
-        $('soc').textContent = INFO.prefisso + r.votante;
+        votante(r.votante);
         $('done-soc').textContent = r.votante;
         costruisci();
         show('s-vote');
@@ -206,9 +216,25 @@
     aggiorna();
   }
 
+  /* Per chi si sta votando: etichetta piccola, nome grande. E' l'unico modo che
+     ha il votante di accorgersi di avere in mano il codice di un'altra societa. */
+  function votante(nome) {
+    var p = $('soc');
+    p.textContent = '';
+    var et = String(INFO.prefisso || '').replace(/[\s:]+$/, '');
+    if (et) { var b = document.createElement('b'); b.textContent = et; p.appendChild(b); }
+    var i = document.createElement('i');
+    i.textContent = nome || '';
+    p.appendChild(i);
+    p.hidden = !(et || nome);
+  }
+
   function aggiorna() {
     var n = scelte().length, pieno = n >= INFO.max;
-    $('contatore').textContent = INFO.max === 1 ? (n ? 'Preferenza espressa (1 su 1)' : 'Esprimi una preferenza') : 'Preferenze: ' + n + ' su massimo ' + INFO.max;
+    $('cont-n').textContent = n;
+    $('cont-max').textContent = INFO.max;
+    $('cont-l').textContent = INFO.max === 1 ? 'preferenza' : 'preferenze';
+    $('cont-box').classList.toggle('full', pieno);
     document.querySelectorAll('#lista input').forEach(function (cb) {
       cb.disabled = pieno && !cb.checked;
       cb.parentNode.classList.toggle('off', cb.disabled);

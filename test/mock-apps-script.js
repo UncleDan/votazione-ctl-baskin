@@ -11,6 +11,7 @@ Sheet.prototype = {
   getLastRow() { for (let i = this.d.length; i > 0; i--) if (this.d[i - 1] && this.d[i - 1].some(v => v !== '' && v != null)) return i; return 0; },
   getLastColumn() { let m = 0; this.d.forEach(r => { for (let j = r.length; j > 0; j--) if (r[j - 1] !== '' && r[j - 1] != null) { m = Math.max(m, j); break; } }); return m; },
   getMaxRows() { return Math.max(this.d.length, 1000); },
+  getMaxColumns() { return Math.max(this.getLastColumn(), 26); },
   cell(r, c) { while (this.d.length < r) this.d.push([]); const row = this.d[r - 1]; while (row.length < c) row.push(''); return row; },
   getRange(r, c, nr, nc) {
     if (typeof r === 'string') { if (r === 'A1') { r = 1; c = 1; nr = 1; nc = 1; } else { r = 2; c = 1; nr = 999; nc = 1; } }
@@ -25,7 +26,8 @@ Sheet.prototype = {
       setFontWeight() { return R; }, setBackground() { return R; }, setFontSize() { return R; },
       setWrap() { return R; }, setVerticalAlignment() { return R; }, setHorizontalAlignment() { return R; },
       setDataValidation() { return R; }, setNumberFormat() { return R; },
-      setFormula(f) { sh.cell(r, c)[c - 1] = f; return R; }
+      setFormula(f) { sh.cell(r, c)[c - 1] = f; return R; },
+      getRow() { return r; }, getColumn() { return c; }
     };
     return R;
   },
@@ -56,7 +58,7 @@ global.SpreadsheetApp = {
   getActive: () => SS, getActiveSpreadsheet: () => SS,
   // con global.SENZA_UI si simula l'esecuzione da trigger a tempo (nessuna interfaccia)
   getUi: () => { if (global.SENZA_UI) throw new Error('Cannot call SpreadsheetApp.getUi() from this context.'); return UI; },
-  newDataValidation() { const b = { requireValueInList: () => b, requireValueInRange: () => b, setAllowInvalid: () => b, build: () => ({}) }; return b; },
+  newDataValidation() { const b = { requireValueInList: () => b, requireValueInRange: () => b, requireTextIsEmail: () => b, setAllowInvalid: () => b, build: () => ({}) }; return b; },
   newRichTextValue() { const o = {}; const b = { setText(t) { o.text = t; return b; }, setLinkUrl() { return b; }, build: () => o }; return b; }
 };
 global.PropertiesService = { getScriptProperties: () => ({
@@ -105,7 +107,14 @@ global.ContentService = {
 
 // --- email di avviso ---
 const email = [];
-global.MailApp = { sendEmail: (to, subject, body) => { email.push({ to, subject, body }); if (global.VERBOSE) console.log('  [email → ' + to + '] ' + subject); } };
+global.MailApp = {
+  sendEmail: (to, subject, body) => {
+    if (to && typeof to === 'object') { subject = to.subject; body = to.body; to = to.to; }
+    email.push({ to, subject, body });
+    if (global.VERBOSE) console.log('  [email → ' + to + '] ' + subject);
+  },
+  getRemainingDailyQuota: () => 1500
+};
 global.Session = { getEffectiveUser: () => ({ getEmail: () => 'custode@example.org' }) };
 
 module.exports = { SS, UI, alerts, props, triggers, email };

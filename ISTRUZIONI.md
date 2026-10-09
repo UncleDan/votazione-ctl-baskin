@@ -1,4 +1,4 @@
-# Votazione CTL Baskin — istruzioni (v20)
+# Votazione CTL Baskin — istruzioni (v21)
 
 Voto online anonimo, utilizzabile da telefono senza account Google:
 
@@ -29,7 +29,7 @@ Il controllo non è solo un'indicazione a schermo: una scheda che arriva dall'in
 1. Nel repository GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**. Questo passaggio va fatto a mano una volta sola e non si può automatizzare: accendere Pages dall'API richiede diritti di amministrazione che il token del workflow non ha.
    Controlla anche **Settings → Actions → General → Workflow permissions**: dev'essere *Read and write permissions*, altrimenti al workflow viene negato il permesso di pubblicare.
 2. **Settings → Secrets and variables → Actions → Variables → New variable**: nome `PONTE`, valore l'indirizzo `/exec` della tua web app Apps Script (lo stesso che usi per votare dalla app). Dev'essere una **Variable**, non un **Secret**: i secret non sono leggibili come `vars.PONTE` e la pagina resterebbe senza indirizzo. Se la variabile manca il workflow pubblica lo stesso, con un avviso, e la pagina si apre ma rifiuta di votare.
-3. Fai un push (o lancia il workflow a mano): la Action pubblica solo la cartella `scheda-html/` e ci inserisce l'indirizzo del ponte.
+3. Fai un push (o lancia il workflow a mano): la Action pubblica solo la cartella `scheda-html/` e ci inserisce l'indirizzo del ponte, **codificato in base64**.
 4. Nel foglio: **Interfaccia di voto → Usa la pagina web (HTML)…** e incolla l'indirizzo della pagina pubblicata.
 **I due errori del primo giro, e cosa vogliono dire.** *Get Pages site failed — Not Found*: Pages non è ancora acceso, fai il punto 1. *Resource not accessible by integration*: al workflow mancano i permessi, controlla che *Workflow permissions* sia su *Read and write*.
 
@@ -37,6 +37,29 @@ Il controllo non è solo un'indicazione a schermo: una scheda che arriva dall'in
 
 Il ponte è lo stesso script: le due pagine usano le stesse funzioni, quindi la stessa urna, gli stessi controlli e lo stesso formato della scheda. Con l'interfaccia HTML il codice viaggia dopo il cancelletto (`#c=…`): i browser non inviano quella parte al server, quindi il codice non finisce nei log.
 
+### L'indirizzo del ponte e il base64
+
+Nel repository l'indirizzo non c'è: nel sorgente resta il segnaposto `__PONTE__`, e la Action lo sostituisce al momento della pubblicazione pescandolo dalla variabile. Nella pagina pubblicata ci finisce **in base64**, e il log della Action non lo stampa — su un repository pubblico anche il log è pubblico.
+
+Sia chiaro cos'è e cosa non è. **Non è cifratura.** La pagina deve usare quell'indirizzo, quindi deve poterlo leggere, e chi apre gli strumenti per sviluppatori lo vede comunque nella prima chiamata: è lì che la richiesta deve andare. Serve solo a non lasciarlo in chiaro nel sorgente, dove lo raccoglierebbe qualunque crawler a caccia di endpoint Apps Script. Una tendina, non una serratura.
+
+E non è una perdita grave se si sa: senza un codice valido il ponte risponde solo a `info`, cioè titolo, sezione e lista dei candidati — le stesse cose che si leggono aprendo la pagina. A proteggere il voto è il codice per società, non questo indirizzo.
+
+### Pubblicare altrove (per esempio sul sito della Sezione Territoriale)
+
+La pagina è un unico file senza dipendenze: funziona da qualunque dominio, perché il ponte non guarda da dove arriva la richiesta. Per spostarla:
+
+1. Copia nel nuovo repository la cartella `scheda-html/` **e** il workflow `.github/workflows/pages.yml`, poi crea lì la variabile `PONTE`. Conviene molto di più che pubblicare a mano: pubblicando a mano l'indirizzo finisce committato nel sorgente, che è proprio quello che il workflow evita.
+2. Se proprio lo fai a mano, l'indirizzo va messo **già in base64** al posto di `__PONTE__`. Lo ottieni dalla console del browser con `btoa("https://script.google.com/…/exec")`, oppure da terminale con `printf '%s' 'https://…/exec' | base64 -w0`.
+3. Nel foglio: *Interfaccia di voto → Usa la pagina web (HTML)…* con il nuovo indirizzo, poi rigenera i messaggi. I link già inviati puntano al vecchio indirizzo e vanno rimandati.
+4. **Spegni la copia vecchia.** Il programma distingue l'app Google dalla pagina web, non una pagina web dall'altra: se resta online, continua a funzionare e le schede finiscono nella stessa urna. Non è un rischio per il voto, ma confonde chi ha il link vecchio.
+
+
+## Una società, un solo candidato
+
+Ogni società può presentare **un solo candidato**. Il programma lo controlla: se una società ne ha più di uno il round 1 **non si apre**, e la segnalazione dice quale società e con quali nomi, così sai esattamente quali righe sistemare nel foglio *Candidati*. Lo stesso controllo compare fra gli avvisi di *Inizializza / aggiorna fogli*, quindi te ne accorgi mentre inserisci i dati e non il giorno dell'apertura.
+
+Gli **autocandidati** sono fuori dal conteggio: non essendo tesserati con nessun club non occupano il posto di nessuna società. Una società può quindi avere il suo candidato anche se un suo ex allenatore, oggi non tesserato, si è candidato da sé.
 
 ## Qualifiche e autocandidature
 
@@ -50,7 +73,9 @@ Se arrivi da una versione precedente, dove `Autocandidatura` era una qualifica, 
 
 ## Provare senza dati veri
 
-**🗳️ Votazione → Riempi con dati di prova…** sostituisce società, squadre e candidati con dati inventati, ma negli stessi numeri dell'Emilia-Romagna 2026/2027: 11 società, 16 squadre, 13 candidati di cui 4 aiuto allenatore e uno autocandidato, due società senza candidati, 6 commissari da eleggere e 7 preferenze per scheda. I nomi vengono dall'alfabeto fonetico (Baskin Alfa, Candidato A…): nessuna persona e nessun club reale.
+**🗳️ Votazione → Azzeramenti → Tutto e riempi con dati di prova…** sostituisce società, squadre e candidati con dati inventati, ma negli stessi numeri dell'Emilia-Romagna 2026/2027: 11 società, 16 squadre, 11 candidati di cui 3 aiuto allenatore e uno autocandidato, una società senza candidati, 6 commissari da eleggere e 6 preferenze per scheda. Rispettano la regola "una società, un solo candidato".
+
+I nomi sono città e personaggi Disney — *Società Sportiva Paperopoli ASD* → squadra *Paperopoli 1* → candidato *Paolino Paperino* —: nessuna persona e nessun club reale, e nessun nome confondibile con quelli veri. Anche gli indirizzi email ci sono, ma finiscono per `@example.invalid`: per costruzione non recapitano a nessuno, e l'invio diretto li salta.
 
 Il titolo viene marcato **(PROVA)**, così non si confonde con una votazione vera: toglilo quando passi ai dati definitivi. La voce si rifiuta di partire se c'è una votazione aperta o se ci sono già voti espressi.
 
@@ -82,9 +107,27 @@ Vale la pena spiegarlo nella comunicazione che accompagna i link: una ricevuta c
 
 ## I messaggi per i votanti
 
-Il foglio **Messaggi** ha una riga per ogni votante del round attivo e, nella terza colonna, il testo già pronto: copi la cella e la incolli nella chat della società, senza ricomporlo ogni volta. Dentro c'è il link personale, il codice, quante preferenze si possono dare, l'eventuale data di chiusura e la spiegazione della ricevuta.
+Il foglio **Messaggi** ha una riga per ogni votante del round attivo: *Destinatario · Codice · Email · Messaggio da copiare e incollare · Apri la mail già scritta*. Il testo sta tutto in **una sola cella**: la copi e la incolli nella chat della società, senza ricomporlo ogni volta. Dentro c'è il link personale, il codice, quante preferenze si possono dare, l'eventuale data di chiusura, la spiegazione della ricevuta e l'avvertenza che il messaggio **si può inoltrare** a un'altra persona della società — il voto è identificato dal codice, non da chi lo usa, e vale una volta sola.
 
-Si rigenera da **🗳️ Votazione → Prepara i messaggi per i votanti**, e da solo ogni volta che i codici cambiano o che azzeri qualcosa. Per il round 2 lancialo dopo *Prepara commissari e link*: i destinatari diventano i commissari eletti.
+Si rigenera da **🗳️ Votazione → Messaggi ai votanti → Prepara i messaggi**, e da solo ogni volta che i codici cambiano o che azzeri qualcosa. Per il round 2 lancialo dopo *Prepara commissari e link*: i destinatari diventano i commissari eletti.
+
+### Le email
+
+Gli indirizzi stanno nella colonna **Email** del foglio *Società*. Puoi scriverli anche direttamente nel foglio *Messaggi*: alla rigenerazione successiva vengono ricopiati in *Società*, dove restano (il foglio *Messaggi* si riscrive da capo ogni volta).
+
+**Più indirizzi per la stessa società** si scrivono nella stessa cella separati da virgola (o punto e virgola): una società ha spesso due referenti. Il messaggio arriva a tutti insieme, in una mail sola, e la scheda resta comunque una — il codice si usa una volta, chiunque dei due lo apra. Prima di mandare, l'avviso ti dice quali società hanno più di un indirizzo. Un indirizzo scritto male in mezzo agli altri non blocca gli altri: viene elencato a parte come da sistemare.
+
+Con un indirizzo presente hai due strade.
+
+**Apri la mail già scritta** — l'ultima colonna. È un link `mailto:` con destinatario, oggetto e testo compilati: apre il tuo programma di posta, non manda niente. Rileggi e spedisci tu. Un avvertimento: i programmi di posta **tagliano i `mailto:` troppo lunghi**, e il nostro testo è lungo. Il limite cambia da client a client; se il corpo arriva troncato, usa la via qui sotto.
+
+**Invia per email a chi ha l'indirizzo…** — nel sottomenu *Messaggi ai votanti*. Manda un messaggio per votante **dal tuo account Google**, uno alla volta e senza copia conoscenza, perché ogni link è personale. Come mittente i votanti vedono *Sezione Territoriale Baskin EISI* seguito dalla Sezione; si cambia in *Config → Mittente email*, e l'indirizzo di posta resta comunque quello del tuo account. Prima di partire ti dice chi riceverà, chi resta da avvisare a mano e quanta quota email ti resta per oggi. Gli indirizzi di prova (`@example.invalid` e simili) vengono saltati. A invio concluso controlla la posta inviata: quello che vedi lì è esattamente quello che hanno ricevuto.
+
+### L'avviso automatico all'apertura
+
+Quando apri la votazione — dal menu o per apertura programmata — il programma manda **da solo** il messaggio a tutte le società che hanno un indirizzo, con dentro il link personale e **la data di chiusura**. Se hai aperto a mano e non c'è una chiusura programmata, il messaggio lo dice e invita a non rimandare.
+
+Parte **una volta per round**: chiudere e riaprire non lo ripete, così nessuno riceve due volte la stessa cosa. Se ti serve rimandarlo, azzera il round oppure usa *Invia per email* dal menu. Chi non ha indirizzo resta da avvisare a mano, e l'avviso di apertura ti dice chi.
 
 ## Tre codici sbagliati
 
@@ -95,7 +138,9 @@ Due precisazioni oneste. Chi ha un codice valido ma ha **già votato** non fa sc
 
 ## Ragione sociale e nome breve
 
-Il foglio **Società** ha due nomi per ogni riga. La prima colonna è la **ragione sociale** esatta, quella dell'affiliazione: serve per gli atti, ma in un messaggio o in un elenco è illeggibile. L'ultima colonna è il **Nome breve**, quello con cui la società si chiama davvero.
+Il foglio **Società** ha due nomi per ogni riga. La prima colonna è la **ragione sociale** esatta, quella dell'affiliazione: serve per gli atti, ma in un messaggio o in un elenco è illeggibile. Poi c'è il **Nome breve**, quello con cui la società si chiama davvero.
+
+In coda ci sono **Email** (vedi sopra) e **Codice affiliazione**: quest'ultimo serve solo per gli atti e non entra in nessun messaggio né nella pagina di voto.
 
 Il nome breve è quello che vedono i votanti: compare nei messaggi, sulla pagina di voto ("stai votando per…"), nel Riepilogo urna, nel Report e nei fogli dei ballottaggi. All'inizializzazione parte uguale alla ragione sociale, quindi finché non lo accorci non cambia niente; se lo lasci vuoto il programma usa comunque la ragione sociale.
 
@@ -107,7 +152,7 @@ Il logo di Ente Italiano Sport Inclusivi è caricato in **hotlinking** (non è n
 - pagina di voto: `https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg`
 - resoconti nei fogli: `https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png` — i fogli Google (funzione IMAGE) **non visualizzano SVG**, quindi va caricata sul sito anche la versione PNG.
 
-Gli indirizzi sono in *Config* ("Logo pagina web", "Logo fogli (PNG)"): lasciandoli vuoti il logo non compare. Nei fogli *Report*, *Riepilogo urna* e *Risultati ballottaggi* il logo è in testa; nei fogli tabellari (*Risultati*, *Risultati Presidente*, *Risultati Vice*) è nel piede, per non spostare le intestazioni delle colonne.
+Gli indirizzi sono in *Config* ("Logo pagina web", "Logo fogli (PNG)"): lasciandoli vuoti il logo non compare. Nei fogli la formula **punta alla cella di Config** (`=IMAGE(Config!$B$n)`) invece di avere l'indirizzo scritto dentro: se il logo cambia indirizzo basta aggiornare *Config* e i resoconti si allineano da soli. Nei fogli *Report*, *Riepilogo urna* e *Risultati ballottaggi* il logo è in testa; nei fogli tabellari (*Risultati*, *Risultati Presidente*, *Risultati Vice*) è nel piede, per non spostare le intestazioni delle colonne.
 
 Il logo è di proprietà di Ente Italiano Sport Inclusivi e non è coperto dalla licenza MIT (vedi `NOTICE`).
 
