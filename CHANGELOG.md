@@ -1,5 +1,33 @@
 # Changelog
 
+## v31
+- **Nella richiesta di conferma c'è l'indirizzo a cui rispondere**, e la precisazione che non serve nessun modulo: basta una mail alla Sezione Territoriale. A chi non ha candidature il messaggio elenca anche cosa scrivere — nome e cognome, qualifica, squadra, anni di tesseramento — così la risposta arriva completa invece di aprire un giro di chiarimenti.
+- Nuovo parametro *Config → Indirizzo per le candidature*. Vuoto vale l'account che possiede il foglio, ma conviene fissarlo: aprendo il foglio con un altro account quell'indirizzo cambierebbe senza darlo a vedere.
+
+## v30
+- **Conferma delle candidature prima dell'apertura**, nuovo sottomenu *Candidature*. Si raccoglie tutto — doppioni, candidature tardive, righe incomplete — si fa confermare a ciascuna società quello che la riguarda, si sistema l'elenco e solo allora si apre il voto.
+  - *Prepara le richieste di conferma* scrive nel foglio "Conferme candidature" un messaggio per società con i suoi candidati **e le loro Note**: quello che scrivi nella colonna Note del foglio "Candidati" finisce nella mail, quindi è lì che si annota «doppione», «requisito mancante», «da verificare».
+  - A chi ha più di un candidato il messaggio ricorda la regola e chiede quale conferma; a chi non ne ha dice che non ne risultano e invita a segnalare un modulo perso — è il modo per accorgersene finché si è in tempo.
+  - Gli autocandidati non compaiono in nessuna mail, perché non appartengono a una società: il programma li elenca a parte perché li confermi direttamente.
+  - *Invia le richieste per email* manda alle righe spuntate in "Da inviare" e poi toglie le spunte, così per sollecitare qualcuno basta rispuntare la sua riga. Queste mail non contengono link di voto.
+- Nuovo parametro *Config → Scadenza conferma candidature*: testo libero, compare nella richiesta.
+- Nuova simulazione `test/simulazione-conferme.js`.
+
+## v29
+- **Graduatoria finale nel Report**, cioè a verbale: tutti i candidati del round 1 in ordine, con preferenze e posizione. È l'ordine di scorrimento se un commissario si dimette, e metterlo nero su bianco il giorno dello spoglio evita di doverlo ricostruire mesi dopo. Ogni riga dice cosa significa quella posizione — *Commissario*, *1° dei non eletti — subentra per primo*, *Rinuncia* — e sotto la tabella la regola è scritta per esteso.
+- **Chi rinuncia va in coda alla graduatoria**, fuori dallo scorrimento; fra più rinunce vale l'ordine alfabetico, perché fra loro non c'è nulla da graduare.
+- **Le rinunce sono verbalizzate**: il Report le elenca per nome, spiegando che i voti restano contati ma il posto non viene occupato.
+- Il Report passa a cinque colonne per ospitare la graduatoria, sempre nel formato A4 verticale.
+
+## v28
+- **Rinuncia di un candidato**, dichiarabile anche a votazione già aperta: una casella nell'ultima colonna del foglio "Candidati". È una decisione di spoglio, non di scheda.
+  - La scheda non cambia e chi ha rinunciato resta votabile fino alla chiusura: toglierlo a urna aperta darebbe schede diverse a chi ha votato prima e a chi vota dopo, e le schede già depositate contengono il suo nome.
+  - I suoi voti restano contati e compaiono nei risultati con esito `RINUNCIA`: sono preferenze espresse davvero, cancellarle falserebbe il controllo «schede = codici usati».
+  - Il posto non va perso: scorre al primo dei non eletti, e *Prepara commissari e link* non lo include.
+  - La stessa casella è nell'ultima colonna del foglio "Commissari", per chi non accetta la Presidenza o il ruolo di Vice.
+  - Chi rinuncia non fa più numero per il vincolo "candidati almeno quanti i posti", e *Inizializza / aggiorna fogli* elenca le rinunce fra gli avvisi.
+- Nuova simulazione `test/simulazione-rinuncia.js`: rinuncia dichiarata a urna aperta, scorrimento del posto, e rinuncia alla carica di Presidente.
+
 ## v27
 - **La riga sulle date parla del round del messaggio, non di quello attivo.** Preparando i messaggi del Presidente mentre era aperto il voto dei Commissari, ai commissari arrivavano le date del round 1. Ora `testoProgramma_` vuole il round di cui parlare e ciascun messaggio porta le proprie.
 - **Prima dell'apertura il messaggio dice entrambe le date**, apertura e chiusura, invece della sola apertura: chi lo riceve sa subito la finestra per intero.

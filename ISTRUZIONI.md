@@ -1,4 +1,4 @@
-# Votazione CTL Baskin — istruzioni (v27)
+# Votazione CTL Baskin — istruzioni (v31)
 
 Voto online anonimo, utilizzabile da telefono senza account Google:
 
@@ -66,6 +66,48 @@ Gli **autocandidati** sono fuori dal conteggio: non essendo tesserati con nessun
 La CTL ha bisogno di **almeno un candidato per posto**: con 11 società i commissari da eleggere sono 6, quindi servono almeno 6 candidature. Con meno, la commissione nascerebbe incompleta e la votazione non servirebbe a niente, perciò il round 1 **non si apre** e il messaggio dice quanti ne mancano. L'avviso compare già in *Inizializza / aggiorna fogli*, mentre stai inserendo i dati, non il giorno dell'apertura.
 
 Se la Sezione Territoriale decide una commissione più piccola, scrivi il numero in *Config → Numero eletti*: quello ha la precedenza sulla regola, e con esso si abbassano sia i posti sia le preferenze per scheda.
+
+## Prima di aprire: far confermare le candidature
+
+Il giro giusto è: **si raccoglie tutto** — comprese le candidature doppie, tardive o incomplete — **si fa confermare a ciascuna società quello che la riguarda**, si sistema l'elenco con le risposte in mano, e solo allora si apre il voto. Correggere prima costa una mail; correggere dopo non si può.
+
+**🗳️ Votazione → Candidature → Prepara le richieste di conferma** scrive nel foglio *Conferme candidature* un messaggio per società, con l'elenco dei suoi candidati — nome, qualifica, squadra, anni — e **le Note di ciascuno**. È lì che il meccanismo diventa utile: quello che scrivi nella colonna *Note* del foglio *Candidati* finisce nella mail, quindi è il posto dove annotare «arrivata dopo la scadenza», «qualifica non indicata nel modulo», «da verificare». Scrivi, rigenera, e il messaggio si aggiorna.
+
+Tre cose che il messaggio fa da solo:
+
+- a chi ha **più di un candidato** ricorda che se ne può presentare uno solo e chiede quale conferma;
+- a chi **non ha candidature** dice che non ne risultano, e invita a segnalare un modulo che si fosse perso — è il modo per accorgersene finché si è in tempo;
+- gli **autocandidati** non compaiono in nessuna mail, perché non appartengono a una società: quelli li confermi direttamente con loro, e il programma te li elenca a parte.
+
+Non esiste un modulo da compilare: **basta una mail alla Sezione Territoriale**, e il messaggio lo dice. A chi non ha candidature elenca anche cosa scrivere — nome e cognome, qualifica, squadra, anni — così la risposta arriva completa invece di aprire un giro di chiarimenti.
+
+Due parametri in *Config*: **Scadenza conferma candidature** (testo libero, per esempio «venerdì 7 novembre») e **Indirizzo per le candidature**. Quest'ultimo lasciato vuoto vale l'account che possiede il foglio — che è poi la casella della Sezione, la stessa da cui partono le mail — ma conviene scriverlo: se un giorno apri il foglio con un altro account, l'indirizzo nel messaggio cambierebbe senza che te ne accorga.
+
+**Candidature → Invia le richieste per email** manda alle righe spuntate nella colonna *Da inviare*, che alla preparazione sono tutte spuntate; dopo l'invio le spunte si tolgono, così per sollecitare qualcuno basta rispuntare la sua riga. Queste mail **non contengono link di voto**: servono solo a confermare.
+
+Poi aggiorni il foglio *Candidati* a mano con le risposte, e procedi con l'apertura.
+
+## Rinuncia di un candidato
+
+Capita che qualcuno dichiari, anche a votazione già aperta, che non accetterebbe l'incarico. Spunta la casella **Rinuncia** nell'ultima colonna del foglio *Candidati*: è una decisione di spoglio, non di scheda.
+
+Cosa succede, e perché:
+
+- **La scheda non cambia.** Chi ha rinunciato resta votabile fino alla chiusura. Toglierlo a urna aperta darebbe schede diverse a chi ha votato prima e a chi vota dopo, e le schede già depositate contengono il suo nome.
+- **I suoi voti si contano e restano nei risultati**, con esito `RINUNCIA`. Sono preferenze realmente espresse: cancellarle falserebbe il conteggio e il controllo «schede = codici usati».
+- **Non occupa il posto**: il posto scorre al primo dei non eletti, e *Prepara commissari e link* non lo include.
+- **Vale anche per le cariche**: la stessa casella c'è nell'ultima colonna del foglio *Commissari*, per chi non accetta la Presidenza o il ruolo di Vice.
+- **Conta nel vincolo sul numero**: chi rinuncia non fa più numero per il minimo di candidati.
+
+- **Finisce a verbale.** Nel *Report* la rinuncia è scritta per esteso, con il nome e la spiegazione: i voti restano contati, il posto non viene occupato.
+
+Avvisa comunque le società per email: il programma non può dirlo sulla scheda senza cambiarla in corsa.
+
+## La graduatoria finale
+
+Il *Report* chiude con la **graduatoria finale del round 1**: tutti i candidati in ordine, con preferenze e posizione. Serve per il verbale, e serve soprattutto dopo: se un commissario si dimette, subentra il primo dei non eletti seguendo quell'ordine, e averlo messo nero su bianco il giorno dello spoglio evita di doverlo ricostruire mesi più tardi.
+
+L'ordine è quello dei risultati — preferenze, poi anni di tesseramento a parità — con due regole in più: **chi ha rinunciato va in coda**, fuori dallo scorrimento, e **fra più rinunce vale l'ordine alfabetico**, perché fra loro non c'è nulla da graduare. Ogni riga dice cosa quella posizione significa: *Commissario*, *1° dei non eletti — subentra per primo*, *Rinuncia*. Sotto la tabella la regola dello scorrimento è scritta a chiare lettere, così il verbale si spiega da sé.
 
 ## Qualifiche e autocandidature
 
