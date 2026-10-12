@@ -73,7 +73,7 @@ verifica(/scorre al candidato successivo/.test(String(foglio('Risultati').d.find
 // ---------------- La graduatoria va a verbale ----------------
 console.log('\n=== Graduatoria finale nel Report');
 aggiornaReport();
-const rep = foglio('Report').d.map(r => r.map(x => String(x == null ? '' : x)));
+const rep = foglio('Verbale').d.map(r => r.map(x => String(x == null ? '' : x)));
 const iG = rep.findIndex(r => /Graduatoria finale/.test(r[0]));
 verifica(iG > 0, 'il Report ha la sezione "Graduatoria finale"');
 const iT = rep.findIndex(r => r[0] === 'Pos.');
@@ -100,7 +100,7 @@ verifica(grad.findIndex(r => /Rinuncia/.test(r[4])) > iPrimaRiserva, 'e le rinun
 // due rinunce: fra loro in ordine alfabetico
 sheet_('Candidati').getRange(4, colRin).setValue(true);     // Candidato C rinuncia
 aggiornaReport();
-const rep2 = foglio('Report').d.map(r => r.map(x => String(x == null ? '' : x)));
+const rep2 = foglio('Verbale').d.map(r => r.map(x => String(x == null ? '' : x)));
 const grad2 = rep2.slice(rep2.findIndex(r => r[0] === 'Pos.') + 1).filter(r => /^\d+$/.test(r[0]));
 const coda = grad2.slice(-2).map(r => r[1]);
 verifica(coda[0] === 'Candidato A' && coda[1] === 'Candidato C',

@@ -1,6 +1,6 @@
 /**
  * Votazione CTL Baskin — voto online anonimo, un voto per società
- * v35 — Google Apps Script legato a un Foglio Google
+ * v37 — Google Apps Script legato a un Foglio Google
  *
  * Codice sorgente: https://github.com/UncleDan/votazione-ctl-baskin
  * Copyright (c) 2026 Daniele Lolli (UncleDan) — Licenza MIT (vedi LICENSE)
@@ -21,7 +21,7 @@
  *          commissari eletti ricevono codice e link e si apre il voto per il
  *          Presidente, chiuso a sua volta a tempo con calcolo finale.
  * Formatore di riferimento: indicato senza votazione (Config).
- * Report, Riepilogo urna per il custode, link al codice sorgente.
+ * Verbale, Riepilogo urna per il custode, link al codice sorgente.
  *
  * Anonimato: le schede sono salvate nelle Script Properties (non nel foglio,
  * quindi senza cronologia versioni), senza codice né orario, e inserite in
@@ -31,11 +31,11 @@
 const SH = {
   CONFIG: 'Config', SOC: 'Società', SQ: 'Squadre', CAND: 'Candidati', RIS: 'Risultati',
   COM: 'Commissari', BAL: 'Ballottaggio', RB: 'Risultati ballottaggi',
-  RP: 'Risultati Presidente', RV: 'Risultati Vice', REP: 'Report', URNA: 'Riepilogo urna',
+  RP: 'Risultati Presidente', RV: 'Risultati Vice', REP: 'Verbale', URNA: 'Riepilogo urna',
   MSG: 'Messaggi', CONF: 'Conferme candidature'
 };
 const REPO_URL = 'https://github.com/UncleDan/votazione-ctl-baskin';
-const VERSIONE = 'v35';
+const VERSIONE = 'v37';
 const LOGO_SVG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg';
 const LOGO_PNG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png';
 const PROPRIETA_LOGO = 'Logo © Ente Italiano Sport Inclusivi (EISI), tutti i diritti riservati';
@@ -122,7 +122,7 @@ function onOpen() {
       .addItem('Mostra interfaccia attiva e indirizzi', 'mostraInterfaccia'))
     .addSeparator()
     .addItem('Aggiorna partecipazione', 'aggiornaPartecipazione')
-    .addItem('Aggiorna report', 'aggiornaReport')
+    .addItem('Aggiorna verbale', 'aggiornaReport')
     .addItem('Aggiorna riepilogo urna', 'aggiornaUrna')
     .addSubMenu(ui.createMenu('Azzeramenti')
       .addItem('Solo i risultati, stessi codici…', 'azzeraRisultati')
@@ -227,6 +227,7 @@ function setup() {
   ['Apertura voto commissari', 'Chiusura voto commissari', 'Apertura voto presidente', 'Chiusura voto presidente']
     .forEach(k => cfgCell_(k).setNumberFormat('dd/mm/yyyy hh:mm'));
 
+  migraNomiFogli_(ss);
   assicuraIntestazione_(ensureSheet_(ss, SH.SOC, SOC_HEADER), SOC_HEADER);
   ensureSheet_(ss, SH.SQ, SQ_HEADER);
   const cand = assicuraIntestazione_(ensureSheet_(ss, SH.CAND, CAND_HEADER), CAND_HEADER);
@@ -261,17 +262,18 @@ function setup() {
   if (!props.getProperty(P_SALT)) props.setProperty(P_SALT, Utilities.getUuid());
   const nuovi = assegnaCodiciMancanti_();   // codici univoci XXXX-9999 a chi non ne ha
   if (nuovi) avvisi.push(nuovi + ' società senza codice: codice e link assegnati ora.');
-  // Report, Riepilogo urna e Messaggi non si aggiornano da soli: la loro
+  // Verbale, Riepilogo urna e Messaggi non si aggiornano da soli: la loro
   // impaginazione (e le colonne nuove) nascono quando vengono riscritti, quindi
   // li si rifa qui. Senza questo, dopo un aggiornamento di versione i fogli
   // restano com'erano e sembra che il programma non sia cambiato.
   dopoAzzeramento_();
+  ordinaFogli_();
   ui_().alert(
     'Fogli pronti.\n\n1) "Società": una riga per società (una riga = un voto).\n' +
     '2) "Squadre": squadra e società di appartenenza.\n' +
     '3) "Candidati": nome, qualifica, squadra, anni.\n' +
     '4) Round 1 → "Genera codici e link mancanti".\n\n' +
-    'Report, Riepilogo urna e Messaggi sono stati rigenerati con questa versione (' + VERSIONE + ').' +
+    'Verbale, Riepilogo urna e Messaggi sono stati rigenerati con questa versione (' + VERSIONE + ').' +
     (avvisi.length ? '\n\n' + avvisi.join('\n\n') : ''));
 }
 
@@ -344,6 +346,39 @@ function assicuraIntestazione_(sh, header) {
     sh.getRange(1, i + 1).setValue(h).setFontWeight('bold').setBackground(BLU);
   });
   return sh;
+}
+
+/** Rinomina i fogli che hanno cambiato nome fra una versione e l'altra. */
+function migraNomiFogli_(ss) {
+  const vecchi = { 'Report': SH.REP };
+  Object.keys(vecchi).forEach(v => {
+    const sh = ss.getSheetByName(v);
+    if (sh && !ss.getSheetByName(vecchi[v])) sh.setName(vecchi[v]);
+  });
+}
+
+/**
+ * Ordine delle schede in fondo al foglio: prima i dati da compilare, poi i
+ * documenti da leggere, poi quello che serve durante la votazione, infine i
+ * risultati e i messaggi. I fogli non ancora creati si saltano, e quelli che
+ * non sono in elenco (aggiunti a mano) restano in coda dove sono.
+ */
+const ORDINE_FOGLI = [SH.CONFIG, SH.SOC, SH.SQ, SH.CONF, SH.CAND, SH.REP, SH.URNA,
+  SH.BAL, SH.COM, SH.RIS, SH.RP, SH.RV, SH.RB, SH.MSG];
+
+function ordinaFogli_() {
+  const ss = SpreadsheetApp.getActive();
+  let attivo = null;
+  try { attivo = ss.getActiveSheet(); } catch (e) {}
+  let pos = 0;
+  ORDINE_FOGLI.forEach(n => {
+    const sh = ss.getSheetByName(n);
+    if (!sh) return;
+    pos++;
+    try { ss.setActiveSheet(sh); ss.moveActiveSheet(pos); } catch (e) {}
+  });
+  if (attivo) { try { ss.setActiveSheet(attivo); } catch (e) {} }
+  return pos;
 }
 
 function ensureSheet_(ss, name, header) {
@@ -2197,7 +2232,7 @@ function triggerChiudeBallottaggio() {
   if (r === 1) proseguiDopoRound1_(); else concludiPresidente_();
 }
 
-/* ================= Report ================= */
+/* ================= Verbale ================= */
 
 function aggiornaReport() {
   const ss = SpreadsheetApp.getActive();
@@ -2228,7 +2263,7 @@ function aggiornaReport() {
   const R = function () { const a = Array.prototype.slice.call(arguments).map(x => x == null ? '' : x);
     while (a.length < W) a.push(''); return a.slice(0, W); };
   const rows = [
-    R(String(c['Titolo'] || 'Elezione CTL') + (intestazione_(c) ? ' — ' + intestazione_(c) : '') + ' — Report'),
+    R(String(c['Titolo'] || 'Elezione CTL') + (intestazione_(c) ? ' — ' + intestazione_(c) : '') + ' — Verbale'),
     R('Sezione Territoriale', sezione_(c) || '(non indicata)'),
     R('Anno sportivo', anno_(c) || '(non indicato)'),
     R('Aggiornato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm')),
@@ -2304,8 +2339,31 @@ function graduatoria_(c) {
   const riserveA = riserve.filter(x => !x.aiuto).length;
   let usatiAiuto = 0;
 
+  // Dove due candidati vicini in graduatoria hanno le stesse preferenze, il
+  // verbale deve dire che cosa ne ha deciso l'ordine: gli anni di tesseramento,
+  // oppure il ballottaggio. Senza, righe con lo stesso numero di voti ed esiti
+  // diversi sembrano messe a caso. Vale per gli eletti e per le riserve, che
+  // sono l'ordine di subentro e quindi vanno giustificate allo stesso modo.
+  const ordinati = eletti.concat(parita, riserve);
+  const stessoPosto = (a, b) => a && b && !!a.aiuto === !!b.aiuto && a.voti === b.voti;
+  const aPari = {};
+  ordinati.forEach((x, k) => {
+    if (stessoPosto(ordinati[k - 1], x) || stessoPosto(x, ordinati[k + 1])) aPari[x.nome] = true;
+  });
+  const etichetta = x => {
+    const n = String((d.ass.esito[x.nome] || {}).nota || '');
+    if (/sorteggio/i.test(n)) return 'Sorteggio';
+    if (/ballottagg/i.test(n)) return 'Ballottaggio';
+    return x.anni + (x.anni === 1 ? ' anno' : ' anni');
+  };
+  const paro = x => aPari[x.nome] ? ' (' + etichetta(x) + ')' : '';
+  // il confine fra l'ultimo eletto e il primo escluso merita una riga a parte
+  const ultimo = eletti.length ? eletti[eletti.length - 1] : null;
+  const primaRiserva = riserve.length ? riserve[0] : null;
+  const confine = stessoPosto(ultimo, primaRiserva) ? etichetta(ultimo) : '';
+
   let pos = 0, scorre = 0;
-  const riga = (x, testo) => out.push({ riga: [++pos, x.nome, x.squadra, x.voti, testo] });
+  const riga = (x, testo) => out.push({ riga: [++pos, x.nome, x.squadra, x.voti, testo + paro(x)] });
   eletti.forEach(x => riga(x, ['Commissario', x.nome === pres ? 'Presidente' : '', x.nome === vice ? 'Vice' : '',
     x.aiuto ? 'aiuto allenatore (deroga)' : ''].filter(Boolean).join(' · ')));
   parita.forEach(x => riga(x, 'Parità da risolvere'));
@@ -2328,6 +2386,14 @@ function graduatoria_(c) {
     'anche con una sola preferenza; un aiuto allenatore subentra solo quando non ne restano, e comunque entro il ' +
     'limite di ' + maxA + (maxA === 1 ? ' aiuto allenatore' : ' aiuti allenatore') + ' in commissione (ora ' +
     aiutiEletti + ').'] });
+  if (Object.keys(aPari).length) out.push({ riga: ['Dove due o più candidati hanno le stesse preferenze, fra parentesi ' +
+    'c\'è quello che ne ha deciso l\'ordine: gli anni di tesseramento o incarichi, oppure il ballottaggio o il ' +
+    'sorteggio se si è arrivati fin lì. Vale anche fra le riserve, perché è l\'ordine con cui subentrano.'] });
+  if (confine) out.push({ riga: ['Sull\'ultimo posto l\'ultimo eletto e il primo dei non eletti avevano le stesse ' +
+    'preferenze (' + ultimo.voti + '): ha deciso ' + (/anni?$/.test(confine)
+      ? 'l\'anzianità, ' + confine + ' contro ' + etichetta(primaRiserva)
+      : confine === 'Sorteggio' ? 'il sorteggio, dopo ' + MAX_BALLOTTAGGI + ' ballottaggi senza esito'
+      : 'il ballottaggio') + '.'] });
   out.push({ riga: ['Sostituzioni possibili senza deroga: ' + sostituzioni +
     ' (' + riserveA + ' fra allenatori e "Altro"' +
     (postiAiuto && riserve.length > riserveA ? ', ' + Math.min(postiAiuto, riserve.length - riserveA) + ' fra gli aiuto allenatore' : '') +

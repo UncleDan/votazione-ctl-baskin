@@ -45,7 +45,16 @@ const SS = {
   sheets: [],
   getSheetByName(n) { return this.sheets.find(s => s.name === n) || null; },
   insertSheet(n) { const s = new Sheet(n); this.sheets.push(s); return s; },
-  toast(m) { if (global.VERBOSE) console.log('  [toast]', m); }
+  toast(m) { if (global.VERBOSE) console.log('  [toast]', m); },
+  getSheets() { return this.sheets.slice(); },
+  getActiveSheet() { return this.attivo || this.sheets[0] || null; },
+  setActiveSheet(s) { this.attivo = s; return s; },
+  moveActiveSheet(pos) {
+    const i = this.sheets.indexOf(this.attivo);
+    if (i < 0) return;
+    this.sheets.splice(i, 1);
+    this.sheets.splice(Math.max(0, Math.min(pos - 1, this.sheets.length)), 0, this.attivo);
+  }
 };
 const alerts = [];
 const UI = {

@@ -125,7 +125,7 @@ vota(codCom, [['Candidato B'], ['Candidato B'], ['Candidato E'], ['Candidato B']
 chiudiVotazione();
 calcola3();
 verifica(cfg_()['Vice'] === 'Candidato B', 'Vice: ' + cfg_()['Vice']);
-stampa('Report');
+stampa('Verbale');
 const urna = foglio('Riepilogo urna').d.map(r => r.join(' '));
 verifica(urna.filter(r => /Controllo OK/.test(r)).length === 6 && !urna.some(r => /ANOMALIA/.test(r)),
   'riepilogo urna: 6 urne (3 round + 3 ballottaggi) tutte coerenti');
@@ -146,18 +146,18 @@ preparaBallottaggio();
 verifica(/manualmente/.test(M.alerts[M.alerts.length - 1]), 'un quarto ballottaggio non è consentito');
 
 console.log('\n=== Logo');
-['Report', 'Riepilogo urna', 'Risultati ballottaggi'].forEach(n =>
+['Verbale', 'Riepilogo urna', 'Risultati ballottaggi'].forEach(n =>
   verifica(/^=IMAGE\(Config!\$B\$\d+\)$/.test(foglio(n).d[0][0]), 'logo in testa al foglio "' + n + '" (formula verso Config, non URL fisso)'));
 ['Risultati', 'Risultati Presidente', 'Risultati Vice'].forEach(n =>
   verifica(foglio(n).d.some(r => /^=IMAGE\(/.test(r[0])), 'logo nel piede del foglio "' + n + '"'));
 // l'altezza della riga del logo deve sopravvivere al ridimensionamento automatico
-['Report', 'Riepilogo urna', 'Risultati', 'Risultati Presidente'].forEach(n => {
+['Verbale', 'Riepilogo urna', 'Risultati', 'Risultati Presidente'].forEach(n => {
   const sh = foglio(n);
   const i = sh.d.findIndex(r => /^=IMAGE\(/.test(String(r[0])));
   verifica(i >= 0 && sh.h && sh.h[i + 1] === 120,
     'riga del logo alta 120 nel foglio "' + n + '" (' + ((sh.h || {})[i + 1] || 'non impostata') + ')');
 });
-verifica(foglio('Report').d.some(r => /Ente Italiano Sport Inclusivi/.test(r[0])), 'nota di proprietà del logo nei resoconti');
+verifica(foglio('Verbale').d.some(r => /Ente Italiano Sport Inclusivi/.test(r[0])), 'nota di proprietà del logo nei resoconti');
 
 console.log('\n' + (errori ? errori + ' verifiche FALLITE' : 'Tutte le verifiche superate.'));
 process.exit(errori ? 1 : 0);

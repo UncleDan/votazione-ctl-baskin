@@ -1,4 +1,4 @@
-# Votazione CTL Baskin — istruzioni (v35)
+# Votazione CTL Baskin — istruzioni (v37)
 
 Voto online anonimo, utilizzabile da telefono senza account Google:
 
@@ -99,13 +99,17 @@ Cosa succede, e perché:
 - **Vale anche per le cariche**: la stessa casella c'è nell'ultima colonna del foglio *Commissari*, per chi non accetta la Presidenza o il ruolo di Vice.
 - **Conta nel vincolo sul numero**: chi rinuncia non fa più numero per il minimo di candidati.
 
-- **Finisce a verbale.** Nel *Report* la rinuncia è scritta per esteso, con il nome e la spiegazione: i voti restano contati, il posto non viene occupato.
+- **Finisce a verbale.** Nel *Verbale* la rinuncia è scritta per esteso, con il nome e la spiegazione: i voti restano contati, il posto non viene occupato.
 
 Avvisa comunque le società per email: il programma non può dirlo sulla scheda senza cambiarla in corsa.
 
 ## La graduatoria finale
 
-Il *Report* chiude con la **graduatoria finale del round 1**: tutti i candidati in ordine, con preferenze e posizione. Serve per il verbale, e serve soprattutto dopo: se un commissario si dimette, subentra il primo dei non eletti seguendo quell'ordine, e averlo messo nero su bianco il giorno dello spoglio evita di doverlo ricostruire mesi più tardi.
+Il *Verbale* chiude con la **graduatoria finale del round 1**: tutti i candidati in ordine, con preferenze e posizione. Serve per il verbale, e serve soprattutto dopo: se un commissario si dimette, subentra il primo dei non eletti seguendo quell'ordine, e averlo messo nero su bianco il giorno dello spoglio evita di doverlo ricostruire mesi più tardi.
+
+Ovunque due candidati vicini in graduatoria abbiano **le stesse preferenze**, accanto alla posizione compare fra parentesi che cosa ne ha deciso l'ordine: gli anni di tesseramento di ciascuno — *(4 anni)*, *(2 anni)* — oppure *(Ballottaggio)*, o *(Sorteggio)* se si è arrivati fin lì. Vale per gli eletti e **anche fra le riserve**, perché quello è l'ordine con cui subentrano e va giustificato allo stesso modo. Senza, righe con lo stesso numero di voti ed esiti diversi sembrano messe a caso.
+
+Il confine fra l'ultimo eletto e il primo dei non eletti, quando è un pari merito, ha anche una riga sua sotto la tabella: è la decisione che più facilmente verrà contestata.
 
 La tabella è in tre blocchi: prima gli **eletti**, dal più votato in giù; poi le **riserve**, nell'ordine in cui subentrano; infine le **rinunce**, in ordine alfabetico, perché fra loro non c'è nulla da graduare.
 
@@ -113,7 +117,7 @@ Fra le riserve vale **la stessa regola dell'elezione**, ed è il punto che conta
 
 Il limite di *Max aiuti allenatore* vale anche per lo scorrimento: un aiuto subentra solo se in commissione ce ne sono meno del limite. Gli aiuti oltre quel limite restano in graduatoria ma sono segnati come **subentrabili solo con deroga della Commissione Tecnica Nazionale (CTN)**.
 
-Sotto la tabella il Report scrive **quante sostituzioni reggono senza deroga**, divise fra allenatori e aiuti: *«Sostituzioni possibili senza deroga: 2 (1 fra allenatori e "Altro", 1 fra gli aiuto allenatore). Esaurite queste, per sostituire un commissario serve una deroga della Commissione Tecnica Nazionale (CTN), oppure si torna al voto.»* È il numero da avere in mente quando arrivano le dimissioni: dice subito se la commissione regge o se bisogna muoversi.
+Sotto la tabella il Verbale scrive **quante sostituzioni reggono senza deroga**, divise fra allenatori e aiuti: *«Sostituzioni possibili senza deroga: 2 (1 fra allenatori e "Altro", 1 fra gli aiuto allenatore). Esaurite queste, per sostituire un commissario serve una deroga della Commissione Tecnica Nazionale (CTN), oppure si torna al voto.»* È il numero da avere in mente quando arrivano le dimissioni: dice subito se la commissione regge o se bisogna muoversi.
 
 Ogni riga dice cosa quella posizione significa: *Commissario*, *1° dei non eletti — subentra per primo*, *2° dei non eletti — aiuto allenatore: subentra solo se non restano allenatori o "Altro"*, *3° dei non eletti — aiuto allenatore: oltre il limite, subentra solo con deroga della CTN*, *Rinuncia*. Sotto la tabella le regole sono scritte a chiare lettere, così il verbale si spiega da sé.
 
@@ -218,7 +222,7 @@ Il foglio **Società** ha due nomi per ogni riga. La prima colonna è la **ragio
 
 In coda ci sono **Email** (vedi sopra) e **Codice affiliazione**: quest'ultimo serve solo per gli atti e non entra in nessun messaggio né nella pagina di voto.
 
-Il nome breve è quello che vedono i votanti: compare nei messaggi, sulla pagina di voto ("stai votando per…"), nel Riepilogo urna, nel Report e nei fogli dei ballottaggi. All'inizializzazione parte uguale alla ragione sociale, quindi finché non lo accorci non cambia niente; se lo lasci vuoto il programma usa comunque la ragione sociale.
+Il nome breve è quello che vedono i votanti: compare nei messaggi, sulla pagina di voto ("stai votando per…"), nel Riepilogo urna, nel Verbale e nei fogli dei ballottaggi. All'inizializzazione parte uguale alla ragione sociale, quindi finché non lo accorci non cambia niente; se lo lasci vuoto il programma usa comunque la ragione sociale.
 
 
 ## Dopo aver aggiornato il codice
@@ -227,15 +231,21 @@ Tre passaggi, e il secondo è quello che si dimentica.
 
 1. **Salva** `Code.gs` e `Index.html` nell'editor.
 2. **Distribuisci → Gestisci distribuzioni → matita → Versione: Nuova versione → Distribuisci.** L'URL `/exec` resta lo stesso. Salvare non basta: il menu del foglio usa il codice salvato, ma la pagina di voto passa dal ponte `/exec`, che serve la **versione distribuita**. Finché non ridistribuisci, la pagina continua a comportarsi come la versione precedente — e lo dichiara, scrivendo in fondo il numero di versione vecchio.
-3. **Ricarica il foglio** e lancia **Inizializza / aggiorna fogli**, che aggiunge le colonne nuove e rigenera Report, Riepilogo urna e Messaggi.
+3. **Ricarica il foglio** e lancia **Inizializza / aggiorna fogli**, che aggiunge le colonne nuove e rigenera Verbale, Riepilogo urna e Messaggi.
 
 Per controllare: *Interfaccia di voto → Mostra interfaccia attiva e indirizzi* ti dice la versione del codice salvato; in fondo alla pagina di voto c'è quella servita dal ponte. Devono coincidere. Se non coincidono, o non hai ridistribuito, oppure la pagina punta a una distribuzione diversa da quella che hai aggiornato — in *Gestisci distribuzioni* controlla che l'URL sia quello che hai messo nella pagina.
 
 ## Stampare i resoconti
 
-Sono formattati per stare in un **A4 verticale** *Report*, *Riepilogo urna*, *Risultati*, *Risultati Presidente*, *Risultati Vice* e *Risultati ballottaggi*: colonne di larghezza fissa, 660 pixel in tutto, con il testo che va a capo invece di allargare la colonna. Prima, con le colonne ridimensionate automaticamente, una riga lunga — l'elenco di chi non ha votato, una scheda con sei preferenze — allargava tutto e la stampa finiva su due pagine affiancate.
+Sono formattati per stare in un **A4 verticale** *Verbale*, *Riepilogo urna*, *Risultati*, *Risultati Presidente*, *Risultati Vice* e *Risultati ballottaggi*: colonne di larghezza fissa, 660 pixel in tutto, con il testo che va a capo invece di allargare la colonna. Prima, con le colonne ridimensionate automaticamente, una riga lunga — l'elenco di chi non ha votato, una scheda con sei preferenze — allargava tutto e la stampa finiva su due pagine affiancate.
 
 Nel dialogo di stampa scegli **Foglio corrente**, formato **A4**, orientamento **Verticale** e scala **Normale (100%)**. Se aggiungi tu delle colonne o allarghi le esistenti, il conto non torna più: il programma rimette le larghezze a posto ogni volta che rigenera i fogli.
+
+## L'ordine dei fogli
+
+*Inizializza / aggiorna fogli* rimette le schede in quest'ordine: prima i dati da compilare (*Config*, *Società*, *Squadre*, *Conferme candidature*, *Candidati*), poi i documenti da leggere (*Verbale*, *Riepilogo urna*), poi quello che serve durante la votazione (*Ballottaggio*, *Commissari*), infine i risultati (*Risultati*, *Risultati Presidente*, *Risultati Vice*, *Risultati ballottaggi*) e i *Messaggi*.
+
+I fogli non ancora creati si saltano, e un foglio aggiunto da te resta in coda dov'è: il programma non lo sposta e non lo tocca.
 
 ## Logo
 
@@ -244,7 +254,7 @@ Il logo di Ente Italiano Sport Inclusivi è caricato in **hotlinking** (non è n
 - pagina di voto: `https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg`
 - resoconti nei fogli: `https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png` — i fogli Google (funzione IMAGE) **non visualizzano SVG**, quindi va caricata sul sito anche la versione PNG.
 
-Gli indirizzi sono in *Config* ("Logo pagina web", "Logo fogli (PNG)"): lasciandoli vuoti il logo non compare. Nei fogli la formula **punta alla cella di Config** (`=IMAGE(Config!$B$n)`) invece di avere l'indirizzo scritto dentro: se il logo cambia indirizzo basta aggiornare *Config* e i resoconti si allineano da soli. Nei fogli *Report*, *Riepilogo urna* e *Risultati ballottaggi* il logo è in testa; nei fogli tabellari (*Risultati*, *Risultati Presidente*, *Risultati Vice*) è nel piede, per non spostare le intestazioni delle colonne.
+Gli indirizzi sono in *Config* ("Logo pagina web", "Logo fogli (PNG)"): lasciandoli vuoti il logo non compare. Nei fogli la formula **punta alla cella di Config** (`=IMAGE(Config!$B$n)`) invece di avere l'indirizzo scritto dentro: se il logo cambia indirizzo basta aggiornare *Config* e i resoconti si allineano da soli. Nei fogli *Verbale*, *Riepilogo urna* e *Risultati ballottaggi* il logo è in testa; nei fogli tabellari (*Risultati*, *Risultati Presidente*, *Risultati Vice*) è nel piede, per non spostare le intestazioni delle colonne.
 
 Il logo è di proprietà di Ente Italiano Sport Inclusivi e non è coperto dalla licenza MIT (vedi `NOTICE`).
 
@@ -326,7 +336,7 @@ Mentre la pianificazione è attiva, la pagina di voto indica quando la votazione
 ## Resoconti
 
 - *Risultati*, *Risultati ballottaggi*, *Risultati Presidente*, *Risultati Vice*.
-- *Report*: Presidente, Vice, Formatore di riferimento (votante/non votante), ballottaggi svolti, commissari con qualifica, squadra e ruolo.
+- *Verbale*: Presidente, Vice, Formatore di riferimento (votante/non votante), ballottaggi svolti, commissari con qualifica, squadra e ruolo.
 - *Riepilogo urna* (per il custode): per ogni round e ballottaggio aventi diritto, chi ha votato e chi no, **controllo schede = codici usati**, bianche, preferenze e schede anonime una per riga per il riconteggio. A votazione aperta mostra solo la partecipazione.
 
 ## Anonimato

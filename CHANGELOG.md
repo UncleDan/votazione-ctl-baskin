@@ -1,5 +1,15 @@
 # Changelog
 
+## v37
+- **L'annotazione del pari merito vale ovunque in graduatoria**, non solo sul confine fra l'ultimo eletto e il primo escluso: fra parentesi compare quello che ha deciso l'ordine — gli anni, il ballottaggio o il sorteggio — anche fra due riserve a pari preferenze, perché quello è l'ordine con cui subentrano.
+- Il confine fra ultimo eletto e primo escluso conserva una riga dedicata sotto la tabella, con i due valori a confronto: è la decisione che più facilmente verrà contestata.
+
+## v36
+- **Il foglio "Report" si chiama "Verbale"**, che è quello che è. Chi arriva da una versione precedente lo trova rinominato da *Inizializza / aggiorna fogli*, con il contenuto intatto; la voce di menu diventa *Aggiorna verbale*.
+- **I fogli vengono rimessi in ordine**: prima i dati da compilare, poi i documenti da leggere, poi quello che serve durante la votazione, infine risultati e messaggi. I fogli non ancora creati si saltano, e un foglio aggiunto a mano resta dov'è.
+- **A pari preferenze fra l'ultimo eletto e il primo dei non eletti**, la graduatoria indica fra parentesi che cosa ha deciso: gli anni di ciascuno — *(4 anni)*, *(2 anni)* — oppure *(Ballottaggio)* o *(Sorteggio)*. Sotto la tabella è ripetuto a parole. Senza, due righe con lo stesso numero di voti ed esiti opposti sembrano un errore di conteggio.
+- Nuova simulazione `test/simulazione-parimerito.js`.
+
 ## v35
 - **Le ricevute si vedono anche a votazione aperta**, non più solo dopo lo spoglio: chi ha votato controlla subito che la sua scheda sia nell'urna. Conteggi e schede restano nascosti fino alla chiusura.
 - **Una ricevuta per cella, in griglia sulle quattro colonne.** Prima stavano tutte stipate in un'unica cella larga poco più di un centimetro: c'erano, ma per trovare la propria bisognava andare a caccia — che era poi il motivo per cui sembravano non esserci.

@@ -158,11 +158,11 @@ verifica(M.email.length === nSoc, 'e le altre societa ne ricevono sempre una a t
 
 // ---------------- "Inizializza / aggiorna fogli" rigenera i resoconti ----------------
 console.log('\n=== Dopo un aggiornamento di versione, setup() rifa report, urna e messaggi');
-foglio('Report').d = [];
+foglio('Verbale').d = [];
 foglio('Riepilogo urna').d = [];
 foglio('Messaggi').d = [['Destinatario', 'Codice', 'Email', 'Messaggio', 'Apri la mail gia scritta']];
 setup();
-verifica(foglio('Report').d.some(r => String(r[0]).trim()), 'il foglio Report e stato riscritto');
+verifica(foglio('Verbale').d.some(r => String(r[0]).trim()), 'il foglio Report e stato riscritto');
 verifica(foglio('Riepilogo urna').d.some(r => String(r[0]).trim()), 'il Riepilogo urna e stato riscritto');
 verifica(foglio('Messaggi').d[0][4] === 'Rimanda',
   'e il foglio Messaggi ha l\'intestazione nuova: "' + foglio('Messaggi').d[0][4] + '"');

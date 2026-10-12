@@ -42,7 +42,7 @@ chiudiVotazione();
 calcola1();
 aggiornaReport();
 
-const rep = foglio('Report').d.map(r => r.map(x => String(x == null ? '' : x)));
+const rep = foglio('Verbale').d.map(r => r.map(x => String(x == null ? '' : x)));
 const grad = rep.slice(rep.findIndex(r => r[0] === 'Pos.') + 1).filter(r => /^\d+$/.test(r[0]));
 const posizione = nome => grad.find(r => r[1] === nome) || [];
 
