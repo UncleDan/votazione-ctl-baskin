@@ -29,11 +29,11 @@ foglio('Squadre').getRange(2, 1, 4, 2).setValues([
   ['Squadra 1', 'Società 1'], ['Squadra 2', 'Società 1'],
   ['Squadra 3', 'Società 2'], ['Squadra 4', 'Società 3']
 ]);
-foglio('Candidati').getRange(2, 1, 4, 4).setValues([
-  ['Candidato A', 'Allenatore', 'Squadra 1', 3],
-  ['Candidato B', 'Allenatore', 'Squadra 3', 2],
-  ['Candidato C', 'Aiuto allenatore', 'Squadra 4', 5],
-  ['Candidato D', 'Altro', 'Autocandidatura', 1]     // autocandidato: non occupa il posto di nessuna societa
+foglio('Candidati').getRange(2, 1, 4, 6).setValues([
+  ['Candidato A', 'Allenatore', 'Squadra 1', 3, '', 'a@esempio-valido.it'],
+  ['Candidato B', 'Allenatore', 'Squadra 3', 2, '', 'b@esempio-valido.it'],
+  ['Candidato C', 'Aiuto allenatore', 'Squadra 4', 5, '', ''],
+  ['Candidato D', 'Altro', 'Autocandidatura', 1, '', '']   // autocandidato: non occupa il posto di nessuna societa
 ]);
 generaCodici();
 const cod = codici('Società', 1);
@@ -129,6 +129,9 @@ console.log('\n=== Messaggi per il Presidente, con le email dei commissari');
 preparaCommissari();
 const shCom = foglio('Commissari');
 verifica(shCom.d[0][7] === 'Email', 'il foglio Commissari ha la colonna "Email"');
+verifica(foglio('Candidati').d[0][5] === 'Email', 'e anche il foglio Candidati');
+verifica(shCom.d.slice(1).filter(r => r[0]).some(r => /@esempio-valido\.it$/.test(String(r[7]))),
+  'e l\'email scritta fra i candidati arriva da sola ai commissari eletti');
 shCom.getRange(2, 8).setValue('commissario@esempio-valido.it');
 messaggiPresidente();
 const msg2 = foglio('Messaggi').d.slice(1).filter(r => r[0]);

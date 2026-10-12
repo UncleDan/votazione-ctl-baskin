@@ -1,6 +1,6 @@
 /**
  * Votazione CTL Baskin — voto online anonimo, un voto per società
- * v22 — Google Apps Script legato a un Foglio Google
+ * v27 — Google Apps Script legato a un Foglio Google
  *
  * Codice sorgente: https://github.com/UncleDan/votazione-ctl-baskin
  * Copyright (c) 2026 Daniele Lolli (UncleDan) — Licenza MIT (vedi LICENSE)
@@ -35,7 +35,7 @@ const SH = {
   MSG: 'Messaggi'
 };
 const REPO_URL = 'https://github.com/UncleDan/votazione-ctl-baskin';
-const VERSIONE = 'v22';
+const VERSIONE = 'v27';
 const LOGO_SVG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg';
 const LOGO_PNG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png';
 const PROPRIETA_LOGO = 'Logo © Ente Italiano Sport Inclusivi (EISI), tutti i diritti riservati';
@@ -50,7 +50,7 @@ const ROUND = {
 };
 const SOC_HEADER = ['Società', 'Codice', 'Link diretto di voto', 'Ha votato', 'Nome breve', 'Email', 'Codice affiliazione'];
 const SQ_HEADER = ['Squadra', 'Società'];
-const CAND_HEADER = ['Candidato', 'Qualifica', 'Squadra', 'Anni tesseramento/incarichi (spareggio)', 'Note'];
+const CAND_HEADER = ['Candidato', 'Qualifica', 'Squadra', 'Anni tesseramento/incarichi (spareggio)', 'Note', 'Email'];
 const COM_HEADER = ['Commissario', 'Qualifica', 'Squadra', 'Codice', 'Link diretto di voto', 'Votato Presidente', 'Votato Vice', 'Email'];
 const BAL_HEADER = ['Votante', 'Codice ballottaggio', 'Link diretto di voto', 'Ha votato'];
 const RIS_HEADER = ['Posizione', 'Candidato', 'Qualifica', 'Squadra', 'Preferenze', 'Anni (spareggio)', 'Esito', 'Note'];
@@ -191,7 +191,7 @@ function setup() {
     ['Stato', 'CHIUSA', 'APERTA / CHIUSA — gestito dal menu'],
     ['Round attivo', 1, 'Gestito dal menu (1 commissari, 2 presidente, 3 vice)'],
     ['Ballottaggio', 0, 'Gestito dal menu (0 = nessuno, altrimenti numero del ballottaggio in corso)'],
-    ['Max preferenze', '', 'Vuoto = metà dei candidati arrotondata per eccesso'],
+    ['Max preferenze', '', 'Vuoto = quante sono i commissari da eleggere (metà delle società, per eccesso, da 3 a 6)'],
     ['Numero eletti', '', 'Vuoto = regola CTL: metà delle società per eccesso, min 3, max 6'],
     ['Max aiuti allenatore', 1, 'Deroga: aiuti allenatore ammessi, solo se non bastano gli altri candidati'],
     ['Messaggio', 'Seleziona i candidati a cui dai la preferenza.', 'Testo sopra la scheda (round 1)'],
@@ -219,7 +219,7 @@ function setup() {
 
   assicuraIntestazione_(ensureSheet_(ss, SH.SOC, SOC_HEADER), SOC_HEADER);
   ensureSheet_(ss, SH.SQ, SQ_HEADER);
-  const cand = ensureSheet_(ss, SH.CAND, CAND_HEADER);
+  const cand = assicuraIntestazione_(ensureSheet_(ss, SH.CAND, CAND_HEADER), CAND_HEADER);
   if (!headers_(cand).qualifica) {  // v1/v2: Candidato | Anni | Note
     cand.insertColumnsAfter(1, 2);
     cand.getRange(1, 2, 1, 2).setValues([['Qualifica', 'Squadra']]).setFontWeight('bold').setBackground(BLU);
@@ -237,6 +237,8 @@ function setup() {
   const doppie = societaDoppie_();
   if (doppie.length) avvisi.push('Ogni societa puo presentare un solo candidato, e queste ne hanno piu di uno:\n' +
     doppie.join('\n') + '\n\nRitira i candidati in eccesso nel foglio "Candidati": il round 1 non si apre finche restano.');
+  const nCand = candidatiRound_(1, cfg_()).length;
+  if (nCand && candidatiMancanti_()) avvisi.push(testoPochiCandidati_(nCand));
 
   applicaValidazioni_();
   const props = PropertiesService.getScriptProperties();
@@ -321,13 +323,11 @@ function assicuraIntestazione_(sh, header) {
   const largo = Math.max(sh.getLastColumn(), 1);
   const att = sh.getRange(1, 1, 1, largo).getValues()[0].map(x => String(x).trim());
   if (sh.getMaxColumns() < header.length) sh.insertColumnsAfter(sh.getMaxColumns(), header.length - sh.getMaxColumns());
-  let q = 0;
   header.forEach((h, i) => {
     if (String(att[i] || '').trim()) return;
     sh.getRange(1, i + 1).setValue(h).setFontWeight('bold').setBackground(BLU);
-    q++;
   });
-  return q;
+  return sh;
 }
 
 function ensureSheet_(ss, name, header) {
@@ -367,8 +367,11 @@ function applicaValidazioni_() {
     SpreadsheetApp.newDataValidation().requireValueInList(elencoSq, true).setAllowInvalid(true).build());
   sq.getRange(2, 2, Math.max(sq.getMaxRows() - 1, 1), 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireValueInRange(soc.getRange('A2:A'), true).setAllowInvalid(true).build());
-  // email delle societa: avvisa se non e un indirizzo, ma lascia scrivere
+  // email: avvisa se non e un indirizzo, ma lascia scrivere (una cella puo
+  // contenerne piu d'uno, separati da virgola, e li il controllo non si applica)
   if (soc.getMaxColumns() >= 6) soc.getRange(2, 6, Math.max(soc.getMaxRows() - 1, 1), 1).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireTextIsEmail().setAllowInvalid(true).build());
+  if (h.email) cand.getRange(2, h.email, n, 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireTextIsEmail().setAllowInvalid(true).build());
 }
 
@@ -677,10 +680,7 @@ function esitoAvviso_(av) {
     (av.errori.length ? '\nNon partiti: ' + av.errori.join('; ') : '');
 }
 
-function oggettoApertura_(c, x) {
-  return String(c['Titolo'] || 'Elezione CTL Baskin') +
-    (x.b ? ' — ballottaggio aperto: si vota da adesso' : ' — si vota da adesso');
-}
+function oggettoApertura_(c, x) { return oggetto_(c, x, 'si vota da adesso'); }
 
 /**
  * Il messaggio di apertura e quello di sempre, con davanti la riga che dice che
@@ -688,16 +688,25 @@ function oggettoApertura_(c, x) {
  * votazione e programmata; quando e stata aperta a mano non esiste, e si dice.
  */
 function testoApertura_(c, x, nome, codice) {
-  const quando = testoProgramma_(c);
+  const quando = testoProgramma_(c, x.r);
   return 'La votazione è APERTA: si vota da adesso.' +
     (quando ? '' : ' La data di chiusura viene comunicata dal Coordinatore della Sezione Territoriale: ' +
       'conviene non rimandare.') + '\n\n' + testoMessaggio_(c, x, nome, codice);
 }
 
-/** Oggetto della mail: uguale per tutti, senza niente di riservato dentro. */
-function oggettoMessaggio_(c, x) {
-  return String(c['Titolo'] || 'Elezione CTL Baskin') +
-    (x.b ? ' — ballottaggio: il link per votare' : ' — il link per votare');
+/** Oggetto della mail: uguale per tutti i votanti, senza niente di riservato dentro. */
+function oggettoMessaggio_(c, x) { return oggetto_(c, x, 'il link per votare'); }
+
+/**
+ * Oggetto della mail. Dice di quale votazione si tratta, perche chi riceve il
+ * secondo o il terzo messaggio ha gia votato una volta e con un oggetto sempre
+ * uguale lo scambierebbe per un doppione.
+ * "Elezione CTL Baskin — Presidente: il link per votare"
+ */
+function oggetto_(c, x, coda) {
+  const quale = String((ROUND[x.r] || ROUND[1]).nome).replace(/\s*CTL\s*$/, '') +
+    (x.b ? ', ballottaggio ' + x.b : '');
+  return String(c['Titolo'] || 'Elezione CTL Baskin') + ' — ' + quale + ': ' + coda;
 }
 
 /** Indirizzo singolo scrivibile: forma plausibile e non un dominio riservato alle prove. */
@@ -857,7 +866,7 @@ function testoMessaggio_(c, x, nome, codice) {
   const titolo = String(c['Titolo'] || 'Elezione CTL Baskin');
   const dove = intestazione_(c);
   const link = link_(codice, c);
-  const quando = testoProgramma_(c);
+  const quando = testoProgramma_(c, x.r);
   const soc = x.r === 1 && !x.b;
   const cosa = x.b
     ? 'il ballottaggio per ' + ROUND[x.r].nome.replace(' CTL', ' della CTL')
@@ -1092,7 +1101,9 @@ function apriRound_(r) {
     if (!Object.keys(codiciMap_()).length) return ui.alert('Nessun codice: usa "Round 1 → Genera codici e link mancanti".');
     const senzaQ = cand.filter(x => !x.qualifica).map(x => x.nome);
     if (senzaQ.length && ui.alert('Qualifica mancante', 'Senza qualifica (trattati come allenatori): ' + senzaQ.join(', ') + '.\nAprire comunque?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
-    if (cand.length < posti_(c) && ui.alert('Candidati insufficienti', 'Ci sono ' + cand.length + ' candidati per ' + posti_(c) + ' posti. Aprire comunque?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+    // Senza almeno un candidato per posto la CTL non si puo comporre: non ha
+    // senso far votare per lasciare posti vuoti, quindi qui si ferma davvero.
+    if (cand.length < posti_(c)) return ui.alert('Candidati insufficienti', testoPochiCandidati_(cand.length, c), ui.ButtonSet.OK);
   } else if (!Object.keys(votantiMap_(r, 0)).length) {
     return ui.alert('I commissari non hanno codici: usa "Round 2 → Prepara commissari e link".');
   }
@@ -1147,13 +1158,15 @@ function preparaCommissari() {
   if (!eletti.length) { ui.alert('Nessun eletto in "Risultati".'); return false; }
 
   const sh = sheet_(SH.COM);
-  const vecchi = {}, vecchieMail = emailCommissari_();
+  const vecchi = {}, vecchieMail = emailCommissari_(), mailCand = {};
+  candidati_().forEach(x => { if (x.email) mailCand[x.nome] = x.email; });
   commissari_().forEach(x => { if (x.codice) vecchi[x.nome] = x.codice; });
   const usati = codiciEsistenti_();
   const rows = eletti.map(r => {
     const nome = String(r[iN]).trim();
     const cod = vecchi[nome] || codiceNuovo_(usati);
-    return [nome, String(r[iQ]).trim(), String(r[iS]).trim(), cod, link_(cod), '', '', vecchieMail[nome] || ''];
+    return [nome, String(r[iQ]).trim(), String(r[iS]).trim(), cod, link_(cod), '', '',
+      vecchieMail[nome] || mailCand[nome] || ''];
   });
   if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, COM_HEADER.length).clearContent();
   sh.getRange(2, 1, rows.length, COM_HEADER.length).setValues(rows);
@@ -1246,7 +1259,7 @@ function calcolaRisultati_(silenzioso) {
   ];
   sh.getRange(out.length + 2, 1, riepilogo.length, RIS_HEADER.length).setValues(riepilogo);
   scriviPiede_(sh, out.length + 2 + riepilogo.length + 1, c);
-  sh.autoResizeColumns(1, RIS_HEADER.length);
+  formatoA4_(sh, out.length + 2 + riepilogo.length + 2, A4_RISULTATI);
   sh.activate();
   aggiornaReport();
   aggiornaUrna();
@@ -1366,7 +1379,7 @@ function calcolaCarica_(r, silenzioso) {
     f('Calcolato il', Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy HH:mm'))];
   sh.getRange(out.length + 2, 1, riep.length, head.length).setValues(riep);
   scriviPiede_(sh, out.length + 2 + riep.length + 1, c);
-  sh.autoResizeColumns(1, head.length);
+  formatoA4_(sh, out.length + 2 + riep.length + 2, A4_CARICA);
   sh.activate();
 
   setCfg_(ROUND[r].cfg, d.vincitore);
@@ -1564,7 +1577,7 @@ function scriviRisultatiBallottaggi_() {
   sh.getRange(1 + o, 1).setFontWeight('bold').setFontSize(14);
   head.forEach(i => sh.getRange(i + o, 1, 1, W).setFontWeight('bold').setBackground(BLU));
   scriviLinkRepo_(sh, rows.length + 2 + o);
-  sh.autoResizeColumns(1, W);
+  formatoA4_(sh, rows.length + 2 + o, A4_LARGHEZZE);
 }
 
 /* ================= Votazioni programmate ================= */
@@ -1981,7 +1994,7 @@ function aggiornaReport() {
   sh.getRange(6 + o, 1, 5, 1).setFontWeight('bold');
   sh.getRange(headRow + o, 1, 1, 4).setFontWeight('bold').setBackground(BLU);
   scriviLinkRepo_(sh, rows.length + 2 + o);
-  formatoA4_(sh, rows.length + 2 + o, 4);
+  formatoA4_(sh, rows.length + 2 + o, A4_LARGHEZZE);
 }
 
 /* ================= Riepilogo per il custode dell'urna ================= */
@@ -2070,7 +2083,7 @@ function aggiornaUrna() {
   bold.forEach(i => sh.getRange(i + o, 1, 1, W).setFontWeight('bold'));
   head.forEach(i => sh.getRange(i + o, 1, 1, W).setFontWeight('bold').setBackground(BLU));
   scriviLinkRepo_(sh, rows.length + 1 + o);
-  formatoA4_(sh, rows.length + 1 + o, W);
+  formatoA4_(sh, rows.length + 1 + o, A4_LARGHEZZE);
 }
 
 /* ================= Azzeramento ================= */
@@ -2382,16 +2395,26 @@ function getInfo(origine) {
 }
 
 /** Frase da mostrare ai votanti quando apertura o chiusura sono programmate. */
-function testoProgramma_(c) {
+/**
+ * La riga sulle date, quella che finisce nei messaggi e sulla pagina di voto.
+ * Vuole il round di cui parlare: senza, userebbe quello attivo, e preparando i
+ * messaggi del Presidente mentre e aperto il round 1 si finirebbe per scrivere
+ * ai commissari le date del voto delle societa.
+ * A urna gia aperta dice quando si chiude; prima dell'apertura dice entrambe le
+ * date, se ci sono. Il round 3 non ha date programmate: li non dice niente.
+ */
+function testoProgramma_(c, round) {
   const p = pianificazione_(c);
-  const r = roundAttivo_(c), ora = new Date();
-  if (aperta_(c)) {
-    const fine = r === 1 ? p.ch1 : r === 2 ? p.ch2 : null;
+  const r = ROUND[round] ? round : roundAttivo_(c);
+  const ora = new Date();
+  const fine = r === 1 ? p.ch1 : r === 2 ? p.ch2 : null;
+  const inizio = r === 1 ? p.ap1 : r === 2 ? (p.ap2 || null) : null;
+  if (aperta_(c) && roundAttivo_(c) === r)
     return fine && fine > ora ? 'La votazione si chiude il ' + dataTesto_(fine) + '.' : '';
-  }
-  const inizio = r === 2 ? (p.ap2 || null) : p.ap1;
-  if (inizio && inizio > ora) return 'La votazione apre il ' + dataTesto_(inizio) + '.';
-  if (r === 1 && p.ch1 && p.ch1 > ora) return 'La votazione apre a breve e si chiude il ' + dataTesto_(p.ch1) + '.';
+  if (inizio && inizio > ora)
+    return 'La votazione apre il ' + dataTesto_(inizio) + '.' +
+      (fine && fine > inizio ? ' Si chiude il ' + dataTesto_(fine) + '.' : '');
+  if (fine && fine > ora) return 'La votazione apre a breve e si chiude il ' + dataTesto_(fine) + '.';
   return '';
 }
 
@@ -2527,8 +2550,9 @@ function scriviLinkRepo_(sh, riga) {
 function scriviLogo_(sh, riga, c) {
   const url = String((c || cfg_())['Logo fogli (PNG)'] || '').trim();
   if (!/^https:\/\//i.test(url)) return false;
-  sh.getRange(riga, 1).setFormula('=IMAGE(' + SH.CONFIG + '!$B$' + cfgCell_('Logo fogli (PNG)').getRow() + ')');
-  sh.setRowHeight(riga, 110);
+  sh.getRange(riga, 1).setFormula('=IMAGE(' + SH.CONFIG + '!$B$' + cfgCell_('Logo fogli (PNG)').getRow() + ')')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sh.setRowHeight(riga, 120);
   return true;
 }
 
@@ -2553,10 +2577,13 @@ function altezzeRighe_(sh) {
  * Le righe tornano ad altezza automatica, altrimenti il testo a capo verrebbe
  * tagliato a 21 pixel.
  */
-const A4_LARGHEZZE = [180, 110, 250, 120];   // 660 px in tutto
+const A4_LARGHEZZE = [180, 110, 250, 120];                       // resoconti a 4 colonne
+const A4_RISULTATI = [55, 130, 85, 110, 60, 60, 75, 85];         // "Risultati" (8 colonne)
+const A4_CARICA = [55, 140, 120, 50, 65, 100, 130];              // Presidente e Vice (7 colonne)
 
-function formatoA4_(sh, righe, colonne) {
-  A4_LARGHEZZE.slice(0, colonne).forEach((w, i) => sh.setColumnWidth(i + 1, w));
+function formatoA4_(sh, righe, larghezze) {
+  const colonne = larghezze.length;
+  larghezze.forEach((w, i) => sh.setColumnWidth(i + 1, w));
   const n = Math.min(righe + 4, sh.getMaxRows());
   const blocco = sh.getRange(1, 1, n, colonne);
   try { blocco.breakApart(); } catch (e) {}
@@ -2588,7 +2615,7 @@ function ballottaggioAttivo_(c) {
 function headers_(sh) {
   const h = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(x => String(x).toLowerCase());
   const find = p => { const i = h.findIndex(x => x.indexOf(p) === 0); return i >= 0 ? i + 1 : 0; };
-  return { nome: find('candidat') || 1, qualifica: find('qualific'), squadra: find('squadr'), anni: find('anni') };
+  return { nome: find('candidat') || 1, qualifica: find('qualific'), squadra: find('squadr'), anni: find('anni'), email: find('email') };
 }
 
 function candidati_() {
@@ -2605,7 +2632,8 @@ function candidati_() {
       aiuto: /aiuto/i.test(q),
       squadra: String(col(r, h.squadra)).trim(),
       auto: /autocand/i.test(String(col(r, h.squadra))),
-      anni: Number(col(r, h.anni)) || 0
+      anni: Number(col(r, h.anni)) || 0,
+      email: String(col(r, h.email)).trim()
     };
   });
 }
@@ -2624,6 +2652,27 @@ function squadre_() {
  * il posto di nessuna societa. Restituisce una riga "Nome breve: tizio, caio"
  * per ogni societa che ne ha piu di uno, in ordine alfabetico.
  */
+/**
+ * La CTL ha bisogno di almeno un candidato per posto: con meno, la commissione
+ * resterebbe incompleta e la votazione non servirebbe a niente. Restituisce
+ * quanti ne mancano, 0 se bastano.
+ */
+function candidatiMancanti_(c) {
+  const cfg = c || cfg_();
+  return Math.max(0, posti_(cfg) - candidatiRound_(1, cfg).length);
+}
+
+/** Spiegazione unica, per l'avviso in fase di inserimento e per il blocco in apertura. */
+function testoPochiCandidati_(quanti, c) {
+  const cfg = c || cfg_();
+  const posti = posti_(cfg);
+  return 'Le societa partecipanti sono ' + numSocieta_() + ', quindi i commissari da eleggere sono ' + posti +
+    ' (meta delle societa per eccesso, da 3 a 6).\n\nI candidati sono ' + quanti + ': ne mancano ' +
+    (posti - quanti) + '. Con meno candidati che posti la CTL resterebbe incompleta, quindi la votazione ' +
+    'non si apre.\n\nRaccogli altre candidature. Se invece la Sezione Territoriale ha deciso una ' +
+    'commissione piu piccola, scrivi il numero in Config → "Numero eletti": quello ha la precedenza sulla regola.';
+}
+
 function societaDoppie_() {
   const brevi = nomiBrevi_(), sq = {}, m = {};
   squadre_().forEach(x => { if (x.squadra) sq[x.squadra] = x.societa; });
@@ -2670,9 +2719,17 @@ function nomiSocieta_() {
   return colonna_(sheet_(SH.SOC), 1).map(x => brevi[x] || x);
 }
 
+/**
+ * Preferenze per scheda nel round 1. Se "Max preferenze" e compilato vale
+ * quello; altrimenti sono tante quanti i posti da assegnare, cioe meta delle
+ * societa partecipanti arrotondata per eccesso (minimo 3, massimo 6).
+ * Il numero non dipende dai candidati: un ritiro o una candidatura dell'ultimo
+ * momento non cambiano quello che e gia stato scritto ai votanti. L'unico
+ * limite e che non si possono dare piu preferenze che nomi in lista.
+ */
 function maxPref_(c, n) {
   const v = parseInt(c['Max preferenze'], 10);
-  return v > 0 ? Math.min(v, n) : Math.ceil(n / 2);
+  return Math.min(v > 0 ? v : posti_(c), n);
 }
 
 function maxAiuti_(c) {

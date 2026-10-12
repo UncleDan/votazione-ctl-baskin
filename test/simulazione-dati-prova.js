@@ -25,6 +25,13 @@ const conCand = new Set(cand.map(x => mappaSquadraSocieta_()[x.squadra]).filter(
 verifica(11 - conCand.size === 1, 'società senza candidati: ' + (11 - conCand.size));
 verifica(societaDoppie_().length === 0, 'nessuna società con più di un candidato');
 verifica(posti_(cfg_()) === 6, 'commissari da eleggere: ' + posti_(cfg_()));
+// le preferenze seguono i posti, non i candidati: un ritiro non cambia il numero
+verifica(maxPref_(cfg_(), 11) === 6 && maxPref_(cfg_(), 9) === 6,
+  'le preferenze restano ' + maxPref_(cfg_(), 9) + ' anche con due candidati in meno');
+verifica(maxPref_(cfg_(), 4) === 4, 'ma non si danno piu preferenze che nomi in lista');
+setCfg_('Max preferenze', 3);
+verifica(maxPref_(cfg_(), 11) === 3, 'e Config ha sempre la precedenza');
+setCfg_('Max preferenze', '');
 verifica(maxPref_(cfg_(), cand.length) === 6, 'preferenze per scheda: ' + maxPref_(cfg_(), cand.length));
 verifica(cand.filter(x => x.auto).length === 1, 'di cui autocandidati: ' + cand.filter(x => x.auto).length);
 verifica(codici().length === 11, 'codici generati: ' + codici().length);
@@ -96,7 +103,14 @@ M.email.length = 0;
 apri1();
 verifica(String(cfg_()['Stato']).toUpperCase() === 'APERTA', 'ora il round 1 si apre');
 verifica(M.email.length === nSoc, 'una mail per societa: ' + M.email.length + ' su ' + nSoc);
-verifica(M.email.every(e => /si vota da adesso/i.test(e.subject)), 'oggetto: "' + (M.email[0] || {}).subject + '"');
+verifica(M.email.every(e => /— Commissari: si vota da adesso$/.test(e.subject)),
+  'oggetto: "' + (M.email[0] || {}).subject + '"');
+verifica(oggettoMessaggio_(cfg_(), contestoRound_(2, cfg_(), 0)) !== oggettoMessaggio_(cfg_(), contestoRound_(1, cfg_(), 0)),
+  'e ogni round ha il suo: "' + oggettoMessaggio_(cfg_(), contestoRound_(2, cfg_(), 0)) + '"');
+verifica(/Vice: il link per votare$/.test(oggettoMessaggio_(cfg_(), contestoRound_(3, cfg_(), 0))),
+  'compreso il Vice: "' + oggettoMessaggio_(cfg_(), contestoRound_(3, cfg_(), 0)) + '"');
+verifica(/Commissari, ballottaggio 2: il link per votare$/.test(oggettoMessaggio_(cfg_(), { r: 1, b: 2 })),
+  'e i ballottaggi si distinguono fra loro');
 verifica(mittente_(cfg_()) === 'Sezione Territoriale Baskin EISI Sezione di prova',
   'mittente predefinito: "' + mittente_(cfg_()) + '"');
 setCfg_('Mittente email', 'Baskin Emilia-Romagna');
@@ -152,6 +166,26 @@ verifica(foglio('Report').d.some(r => String(r[0]).trim()), 'il foglio Report e 
 verifica(foglio('Riepilogo urna').d.some(r => String(r[0]).trim()), 'il Riepilogo urna e stato riscritto');
 verifica(foglio('Messaggi').d[0][4] === 'Rimanda',
   'e il foglio Messaggi ha l\'intestazione nuova: "' + foglio('Messaggi').d[0][4] + '"');
+
+// ---------------- Servono almeno tanti candidati quanti i posti ----------------
+console.log('\n=== Senza abbastanza candidati la votazione non si apre');
+chiudiVotazione();
+const prima = candidati_().length;
+sh.getRange(6, 1, prima, 5).setValues(Array.from({ length: prima }, () => ['', '', '', '', '']));
+const rimasti = candidati_().length;
+verifica(rimasti < posti_(cfg_()), 'lasciati ' + rimasti + ' candidati per ' + posti_(cfg_()) + ' posti');
+verifica(candidatiMancanti_() === posti_(cfg_()) - rimasti, 'ne mancano ' + candidatiMancanti_());
+M.alerts.length = 0;
+apri1();
+verifica(String(cfg_()['Stato']).toUpperCase() !== 'APERTA', 'il round 1 resta chiuso');
+verifica(M.alerts.some(a2 => /ne mancano 2/.test(String(a2))), 'e viene detto quanti ne mancano');
+// la Sezione puo decidere una commissione piu piccola: Config ha la precedenza
+setCfg_('Numero eletti', rimasti);
+verifica(candidatiMancanti_() === 0, 'con "Numero eletti" abbassato a ' + rimasti + ' il vincolo e rispettato');
+apri1();
+verifica(String(cfg_()['Stato']).toUpperCase() === 'APERTA', 'e il round si apre');
+chiudiVotazione();
+setCfg_('Numero eletti', '');
 
 console.log(errori ? '\n' + errori + ' verifiche fallite.' : '\nTutte le verifiche superate.');
 process.exit(errori ? 1 : 0);
