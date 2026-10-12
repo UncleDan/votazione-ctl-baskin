@@ -56,7 +56,7 @@ generaCodici();
 console.log('\n=== Domanda: 16 squadre di 11 società');
 verifica(numSocieta_() === 11, 'società aventi diritto al voto: ' + numSocieta_() + ' (una scheda ciascuna, non 16)');
 verifica(posti_(cfg_()) === 6, 'commissari da eleggere: ' + posti_(cfg_()) + ' (metà di 11 per eccesso = 6, massimo 6)');
-verifica(maxPref_(cfg_(), cand.length) === 5, 'preferenze per scheda: ' + maxPref_(cfg_(), cand.length) + ' (metà di 10 candidati)');
+verifica(maxPref_(cfg_(), cand.length) === 6, 'preferenze per scheda: ' + maxPref_(cfg_(), cand.length) + ' (quanti i posti, non i candidati)');
 
 // ---------------- Round 1 ----------------
 console.log('\n=== Round 1 – Commissari CTL');

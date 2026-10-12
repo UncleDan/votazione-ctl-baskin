@@ -1,10 +1,10 @@
-# Votazione CTL Baskin — istruzioni (v22)
+# Votazione CTL Baskin — istruzioni (v27)
 
 Voto online anonimo, utilizzabile da telefono senza account Google:
 
 | Fase | Chi vota | Chi è votabile | Preferenze | Esito |
 |---|---|---|---|---|
-| Round 1 – Commissari CTL | una scheda per **società** | foglio *Candidati* | metà dei candidati (per eccesso) | commissari eletti |
+| Round 1 – Commissari CTL | una scheda per **società** | foglio *Candidati* | quante sono i posti da assegnare | commissari eletti |
 | Round 2 – Presidente | ogni commissario eletto | tutti i commissari | 1 | il più votato |
 | Round 3 – Vice | ogni commissario eletto | commissari tranne il Presidente | 1 | il più votato |
 | Ballottaggio (fino a 3) | gli stessi votanti del round | solo i candidati a pari merito | quanti sono i posti in parità | i più votati |
@@ -60,6 +60,12 @@ La pagina è un unico file senza dipendenze: funziona da qualunque dominio, perc
 Ogni società può presentare **un solo candidato**. Il programma lo controlla: se una società ne ha più di uno il round 1 **non si apre**, e la segnalazione dice quale società e con quali nomi, così sai esattamente quali righe sistemare nel foglio *Candidati*. Lo stesso controllo compare fra gli avvisi di *Inizializza / aggiorna fogli*, quindi te ne accorgi mentre inserisci i dati e non il giorno dell'apertura.
 
 Gli **autocandidati** sono fuori dal conteggio: non essendo tesserati con nessun club non occupano il posto di nessuna società. Una società può quindi avere il suo candidato anche se un suo ex allenatore, oggi non tesserato, si è candidato da sé.
+
+## Candidati almeno quanti i posti
+
+La CTL ha bisogno di **almeno un candidato per posto**: con 11 società i commissari da eleggere sono 6, quindi servono almeno 6 candidature. Con meno, la commissione nascerebbe incompleta e la votazione non servirebbe a niente, perciò il round 1 **non si apre** e il messaggio dice quanti ne mancano. L'avviso compare già in *Inizializza / aggiorna fogli*, mentre stai inserendo i dati, non il giorno dell'apertura.
+
+Se la Sezione Territoriale decide una commissione più piccola, scrivi il numero in *Config → Numero eletti*: quello ha la precedenza sulla regola, e con esso si abbassano sia i posti sia le preferenze per scheda.
 
 ## Qualifiche e autocandidature
 
@@ -117,7 +123,7 @@ Per i round 2 e 3 ci sono due voci apposta — **Prepara i messaggi per il Presi
 
 ### Le email
 
-Gli indirizzi stanno nella colonna **Email**: nel foglio *Società* per le società, nel foglio *Commissari* per i commissari (round 2 e 3). Puoi scriverli anche direttamente nel foglio *Messaggi*: alla rigenerazione successiva vengono ricopiati in *Società*, dove restano (il foglio *Messaggi* si riscrive da capo ogni volta).
+Gli indirizzi stanno nella colonna **Email**: nel foglio *Società* per le società, nel foglio *Commissari* per i commissari (round 2 e 3). Conviene però scriverli già nel foglio **Candidati**: quando *Prepara commissari e link* crea la riga di un eletto, l'indirizzo lo porta con sé, e per il voto del Presidente non c'è più niente da cercare. Puoi scriverli anche direttamente nel foglio *Messaggi*: alla rigenerazione successiva vengono ricopiati in *Società*, dove restano (il foglio *Messaggi* si riscrive da capo ogni volta).
 
 **Più indirizzi per la stessa società** si scrivono nella stessa cella separati da virgola (o punto e virgola): una società ha spesso due referenti. Il messaggio arriva a tutti insieme, in una mail sola, e la scheda resta comunque una — il codice si usa una volta, chiunque dei due lo apra. Prima di mandare, l'avviso ti dice quali società hanno più di un indirizzo. Un indirizzo scritto male in mezzo agli altri non blocca gli altri: viene elencato a parte come da sistemare.
 
@@ -126,6 +132,10 @@ Con un indirizzo presente hai due strade.
 **Invia per email a chi ha l'indirizzo…** — nel sottomenu *Messaggi ai votanti*. Manda un messaggio per votante **dal tuo account Google**, uno alla volta e senza copia conoscenza, perché ogni link è personale. Come mittente i votanti vedono *Sezione Territoriale Baskin EISI* seguito dalla Sezione; si cambia in *Config → Mittente email*, e l'indirizzo di posta resta comunque quello del tuo account. Prima di partire ti dice chi riceverà, chi resta da avvisare a mano e quanta quota email ti resta per oggi. Gli indirizzi di prova (`@example.invalid` e simili) vengono saltati. A invio concluso controlla la posta inviata: quello che vedi lì è esattamente quello che hanno ricevuto.
 
 **Rimanda le email spuntate…** — quando qualcuno dice di non aver ricevuto niente. Metti la spunta nella colonna **Rimanda** del foglio *Messaggi*, sulle righe che ti interessano, e lancia la voce: parte solo a quelli. A invio fatto le spunte si tolgono da sole, così non si rimanda due volte per distrazione.
+
+**Le date sono nel messaggio**, se la votazione è programmata: preparandolo prima dell'apertura si legge *«La votazione apre il 16/11/2026 09:00. Si chiude il 23/11/2026 20:00.»*, e nella mail automatica dell'apertura *«La votazione si chiude il 23/11/2026 20:00.»* Sono le date del round di quel messaggio, non di quello in corso: i messaggi del Presidente preparati mentre si vota per i Commissari portano le date del round 2. Se non hai programmato niente, la riga non compare e la chiusura va comunicata a parte.
+
+**L'oggetto dice di quale votazione si tratta** — *Elezione CTL Baskin — Presidente: il link per votare* — e cambia a ogni round e a ogni ballottaggio. Chi riceve il secondo o il terzo messaggio ha già votato una volta: con un oggetto sempre uguale lo scambierebbe per un doppione e lo lascerebbe lì.
 
 ### L'avviso automatico all'apertura
 
@@ -159,9 +169,9 @@ Tre passaggi, e il secondo è quello che si dimentica.
 
 Per controllare: *Interfaccia di voto → Mostra interfaccia attiva e indirizzi* ti dice la versione del codice salvato; in fondo alla pagina di voto c'è quella servita dal ponte. Devono coincidere. Se non coincidono, o non hai ridistribuito, oppure la pagina punta a una distribuzione diversa da quella che hai aggiornato — in *Gestisci distribuzioni* controlla che l'URL sia quello che hai messo nella pagina.
 
-## Stampare Report e Riepilogo urna
+## Stampare i resoconti
 
-I due fogli sono formattati per stare in un **A4 verticale**: quattro colonne di larghezza fissa, 660 pixel in tutto, con il testo che va a capo invece di allargare la colonna. Prima, con le colonne ridimensionate automaticamente, una riga lunga — l'elenco di chi non ha votato, una scheda con sei preferenze — allargava tutto e la stampa finiva su due pagine affiancate.
+Sono formattati per stare in un **A4 verticale** *Report*, *Riepilogo urna*, *Risultati*, *Risultati Presidente*, *Risultati Vice* e *Risultati ballottaggi*: colonne di larghezza fissa, 660 pixel in tutto, con il testo che va a capo invece di allargare la colonna. Prima, con le colonne ridimensionate automaticamente, una riga lunga — l'elenco di chi non ha votato, una scheda con sei preferenze — allargava tutto e la stampa finiva su due pagine affiancate.
 
 Nel dialogo di stampa scegli **Foglio corrente**, formato **A4**, orientamento **Verticale** e scala **Normale (100%)**. Se aggiungi tu delle colonne o allarghi le esistenti, il conto non torna più: il programma rimette le larghezze a posto ogni volta che rigenera i fogli.
 
@@ -187,7 +197,7 @@ Il logo è di proprietà di Ente Italiano Sport Inclusivi e non è coperto dalla
 
 ## Preparazione
 
-1. *Config*: **Sezione Territoriale** (es. Emilia-Romagna) e **Anno sportivo** (testo libero, es. 2026/2027): compaiono sulla pagina di voto e in tutti i resoconti. Lascia vuoti "Numero eletti" e "Max preferenze" per applicare il regolamento. "Max aiuti allenatore" = 1.
+1. *Config*: **Sezione Territoriale** (es. Emilia-Romagna) e **Anno sportivo** (testo libero, es. 2026/2027): compaiono sulla pagina di voto e in tutti i resoconti. Lascia vuoti "Numero eletti" e "Max preferenze" per applicare il regolamento: i commissari da eleggere sono metà delle società arrotondata per eccesso (da 3 a 6), e le preferenze per scheda sono altrettante. "Max aiuti allenatore" = 1.
 2. *Squadre*: una riga per squadra con la **società** di appartenenza (menu a tendina).
 3. *Società*: una riga per società partecipante. **Una riga = un voto.** Le società indicate in *Squadre* vengono aggiunte da sole alla generazione dei codici.
 4. *Candidati*: nome (in ordine alfabetico: è l'ordine della scheda), **Qualifica**, **Squadra**, anni di tesseramento/incarichi.

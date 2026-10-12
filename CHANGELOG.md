@@ -1,5 +1,28 @@
 # Changelog
 
+## v27
+- **La riga sulle date parla del round del messaggio, non di quello attivo.** Preparando i messaggi del Presidente mentre era aperto il voto dei Commissari, ai commissari arrivavano le date del round 1. Ora `testoProgramma_` vuole il round di cui parlare e ciascun messaggio porta le proprie.
+- **Prima dell'apertura il messaggio dice entrambe le date**, apertura e chiusura, invece della sola apertura: chi lo riceve sa subito la finestra per intero.
+- Il round 3 non ha date programmate e non ne inventa: lì la riga non compare.
+
+## v26
+- **L'oggetto delle email dice di quale votazione si tratta**: *Elezione CTL Baskin — Commissari / Presidente / Vice: il link per votare*, e per i ballottaggi anche il numero del giro. Prima era identico per tutti i round, e chi riceveva il secondo messaggio — avendo già votato una volta — rischiava di scambiarlo per un doppione. Vale sia per i messaggi mandati dal menu sia per l'avviso automatico all'apertura.
+
+## v25
+- **Risultati, Risultati Presidente, Risultati Vice e Risultati ballottaggi stanno in un A4 verticale**, come già Report e Riepilogo urna. Erano rimasti con il ridimensionamento automatico, e la riga del piede — quella lunga con licenza, versione e link — allargava la prima colonna a tutto schermo, sfasando l'intestazione della tabella rispetto ai dati.
+- **Colonna "Email" nel foglio "Candidati"**, che *Prepara commissari e link* porta con sé nella riga dell'eletto: l'indirizzo si scrive una volta sola, quando arriva la candidatura, e per il voto del Presidente è già lì.
+- **I loghi inseriti con `IMAGE` sono centrati** nella cella, in orizzontale e in verticale, e la riga è alta 120.
+
+## v24
+- **Servono almeno tanti candidati quanti i posti**, e ora è un vincolo vero: con meno, il round 1 non si apre. Prima era una domanda *"Aprire comunque?"* a cui si poteva rispondere di sì, e si finiva a far votare per una commissione che sarebbe comunque nata incompleta. Il messaggio dice quante sono le società, quanti i posti che ne derivano e quanti candidati mancano.
+- Lo stesso avviso compare fra quelli di *Inizializza / aggiorna fogli*, così il problema si vede mentre si inseriscono le candidature e non il giorno dell'apertura.
+- La via d'uscita resta esplicita: *Config → Numero eletti* ha la precedenza sulla regola, e abbassa insieme posti e preferenze per scheda. Vale anche per le aperture programmate, che in mancanza di candidati non aprono e lo scrivono nell'email di avviso.
+
+## v23
+- **Le preferenze per scheda seguono i posti, non i candidati.** Erano metà dei candidati arrotondata per eccesso; ora sono tante quanti i commissari da eleggere, cioè metà delle società partecipanti per eccesso (da 3 a 6). Con 11 società fanno 6, prima o poi che si chiuda la raccolta delle candidature.
+  Il motivo è pratico: il numero entra nei messaggi inviati alle società, e con la vecchia regola bastava un ritiro per renderli tutti sbagliati senza che nessuno se ne accorgesse. Agganciato ai posti, cambia solo se cambiano le società.
+  Resta un limite di buon senso: non si danno più preferenze che nomi in lista. E *Config → Max preferenze*, se compilato, continua ad avere la precedenza su tutto.
+
 ## v22
 - **Tolto il link `mailto:`** dal foglio "Messaggi": dava errore nei client, e per sua natura non poteva funzionare bene — i programmi di posta tagliano gli indirizzi `mailto:` lunghi, e il nostro testo lo è. Al suo posto c'è qualcosa di più utile.
 - **Colonna "Rimanda"** nel foglio "Messaggi", con una casella per riga, e la voce *Messaggi ai votanti → Rimanda le email spuntate…*: si spunta chi dice di non aver ricevuto niente e si rimanda solo a quelli. A invio fatto le spunte si tolgono da sole.

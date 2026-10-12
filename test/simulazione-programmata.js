@@ -79,6 +79,11 @@ daTrigger('triggerApreCommissari');
 verifica(aperta_(cfg_()) && roundAttivo_(cfg_()) === 1, 'il voto commissari si è aperto da solo');
 verifica(/aperto/i.test(ultimaMail().subject), 'email di avviso di apertura inviata');
 verifica(/si chiude il/.test(getInfo().programma), 'la pagina di voto mostra quando si chiude: ' + getInfo().programma);
+// la riga sulle date parla del round giusto, non di quello attivo
+verifica(/si chiude il/.test(testoProgramma_(cfg_(), 1)), 'round 1 aperto: la riga dice quando si chiude');
+verifica(testoProgramma_(cfg_(), 2) !== testoProgramma_(cfg_(), 1) && /si chiude il/.test(testoProgramma_(cfg_(), 2)),
+  'per il round 2 parla delle SUE date: "' + testoProgramma_(cfg_(), 2) + '"');
+verifica(testoProgramma_(cfg_(), 3) === '', 'il round 3 non ha date programmate e non ne inventa');
 
 console.log('\n=== Chiusura a tempo con voti mancanti → proroga');
 const ctx1 = getInfo().ctx;
