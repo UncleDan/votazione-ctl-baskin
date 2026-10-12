@@ -1,6 +1,6 @@
 /**
  * Votazione CTL Baskin — voto online anonimo, un voto per società
- * v31 — Google Apps Script legato a un Foglio Google
+ * v34 — Google Apps Script legato a un Foglio Google
  *
  * Codice sorgente: https://github.com/UncleDan/votazione-ctl-baskin
  * Copyright (c) 2026 Daniele Lolli (UncleDan) — Licenza MIT (vedi LICENSE)
@@ -35,7 +35,7 @@ const SH = {
   MSG: 'Messaggi', CONF: 'Conferme candidature'
 };
 const REPO_URL = 'https://github.com/UncleDan/votazione-ctl-baskin';
-const VERSIONE = 'v31';
+const VERSIONE = 'v34';
 const LOGO_SVG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg';
 const LOGO_PNG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png';
 const PROPRIETA_LOGO = 'Logo © Ente Italiano Sport Inclusivi (EISI), tutti i diritti riservati';
@@ -59,7 +59,7 @@ const CONF_HEADER = ['Società', 'Email', 'Candidati che risultano', 'Messaggio 
 const LETTERE = 'ABCDEFGH';      // codici: 4 lettere A–H
 const CIFRE = '0123456789';      // + 4 cifre, nel formato XXXX-9999
 const FUSO = 'Europe/Rome';
-const TRIGGER_FN = ['triggerApreCommissari', 'triggerChiudeCommissari', 'triggerAprePresidente', 'triggerChiudePresidente', 'triggerChiudeBallottaggio'];
+const TRIGGER_FN = ['triggerApreCommissari', 'triggerChiudeCommissari', 'triggerAprePresidente', 'triggerChiudePresidente', 'triggerChiudeBallottaggio', 'triggerSollecito'];
 const LOG_ = [];                 // messaggi raccolti quando si lavora senza interfaccia (trigger)
 const QUALIFICHE = ['Allenatore', 'Aiuto allenatore', 'Altro'];
 // L'autocandidatura non e una qualifica ma un modo di arrivare in lista: si indica
@@ -72,6 +72,7 @@ const CFG_URL_HTML = 'Indirizzo interfaccia HTML';
 const CFG_MITTENTE = 'Mittente email';
 const CFG_SCADENZA = 'Scadenza conferma candidature';
 const CFG_INDIRIZZO = 'Indirizzo per le candidature';
+const CFG_SOLLECITI = 'Solleciti prima della chiusura (ore)';
 
 /* ================= Menu ================= */
 
@@ -217,7 +218,8 @@ function setup() {
     [CFG_URL_HTML, '', 'Indirizzo della pagina su GitHub Pages. Serve solo con l\'interfaccia HTML: entra nei link inviati ai votanti'],
     [CFG_MITTENTE, '', 'Nome del mittente delle email ai votanti. Vuoto = "Sezione Territoriale Baskin EISI " piu la Sezione. L\'indirizzo resta quello del tuo account Google'],
     [CFG_SCADENZA, '', 'Entro quando le societa devono confermare le candidature (testo libero, es. "venerdi 7 novembre"). Compare nella richiesta di conferma'],
-    [CFG_INDIRIZZO, '', 'Indirizzo a cui le societa mandano candidature e conferme. Vuoto = l\'account che possiede il foglio']
+    [CFG_INDIRIZZO, '', 'Indirizzo a cui le societa mandano candidature e conferme. Vuoto = l\'account che possiede il foglio'],
+    [CFG_SOLLECITI, '4, 2', 'Quante ore prima della chiusura mandare il promemoria a chi non ha votato. Separate da virgola, vuoto = nessun sollecito']
   ].forEach(r => ensureCfgRow_(r[0], r[1], r[2]));
   cfgCell_(CFG_INTERFACCIA).setDataValidation(
     SpreadsheetApp.newDataValidation().requireValueInList(INTERFACCE, true).setAllowInvalid(false).build());
@@ -1293,6 +1295,7 @@ function chiudiVotazione() {
   const r = roundAttivo_(c0);
   eliminaTrigger_(ballottaggioAttivo_(c0) ? 'triggerChiudeBallottaggio'
     : r === 2 ? 'triggerChiudePresidente' : r === 1 ? 'triggerChiudeCommissari' : null);
+  eliminaTrigger_('triggerSollecito');
   setCfg_('Stato', 'CHIUSA');
   aggiornaPartecipazione();
   aggiornaUrna();
@@ -1844,6 +1847,9 @@ function programmaVotazioni() {
   else if (p.ap1) righe.push('Apertura voto commissari già passata: aprilo a mano dal menu.');
   if (p.ch1 && p.ch1 > min) { creaTrigger_('triggerChiudeCommissari', p.ch1); righe.push('Chiude il voto commissari: ' + dataTesto_(p.ch1)); }
   else if (p.ch1) righe.push('Chiusura voto commissari già passata: non programmata.');
+  const sol = creaSolleciti_(p.ch1 && p.ch1 > min ? p.ch1 : null);
+  righe.push(sol.length ? 'Promemoria a chi non ha votato: ' + sol.join(' e ') + ' ore prima della chiusura'
+    : 'Promemoria a chi non ha votato: nessuno (vedi Config → "' + CFG_SOLLECITI + '")');
   righe.push(p.ap2 ? 'Apre il voto presidente: ' + dataTesto_(p.ap2) : 'Apre il voto presidente: subito dopo la chiusura del voto commissari');
   righe.push(p.ch2 ? 'Chiude il voto presidente: ' + dataTesto_(p.ch2) : 'Chiusura voto presidente: non programmata (manuale)');
   righe.push('');
@@ -1898,6 +1904,78 @@ function mancanti_(r, b) {
  * Chiusura programmata di un round: chiude solo se hanno votato tutti,
  * altrimenti proroga e avvisa. Restituisce true se il round è stato chiuso.
  */
+/** Le ore di anticipo dei solleciti, dalla piu lontana alla piu vicina (max 4). */
+function oreSolleciti_(c) {
+  return String((c || cfg_())[CFG_SOLLECITI] || '').split(/[,;\s]+/)
+    .map(x => parseFloat(String(x).replace(',', '.')))
+    .filter(x => x > 0).sort((a, b) => b - a).slice(0, 4);
+}
+
+/**
+ * Programma i promemoria a chi non ha ancora votato, a N ore dalla chiusura.
+ * Puntano tutti alla stessa funzione: un trigger per ogni anticipo indicato in
+ * Config. Si rifanno da capo ogni volta che la chiusura cambia (anche per
+ * proroga), e si saltano gli anticipi gia passati.
+ */
+function creaSolleciti_(fine) {
+  eliminaTrigger_('triggerSollecito');
+  if (!fine) return [];
+  const limite = new Date(new Date().getTime() + 60000);
+  const fatti = [];
+  oreSolleciti_(cfg_()).forEach(h => {
+    const q = new Date(fine.getTime() - h * 3600000);
+    if (q > limite) { ScriptApp.newTrigger('triggerSollecito').timeBased().at(q).create(); fatti.push(h); }
+  });
+  return fatti;
+}
+
+/** Codice -> nome di chi non ha ancora votato nel contesto indicato. */
+function nonVotanti_(r, b) {
+  const used = usati_(r, b || 0), map = votantiMap_(r, b || 0), out = {};
+  Object.keys(map).forEach(k => { if (used.indexOf(hash_(k)) < 0) out[k] = map[k]; });
+  return out;
+}
+
+/**
+ * Promemoria automatico: manda il link a chi non ha ancora votato, poche ore
+ * prima della chiusura. Non parte se la votazione e chiusa, se la chiusura non
+ * e programmata o se hanno gia votato tutti.
+ */
+function triggerSollecito() {
+  LOG_.length = 0;
+  const c = cfg_();
+  if (!aperta_(c)) return;
+  const x = contesto_(c);
+  if (x.errore) return;
+  const fine = scadenzaContesto_(c, x);
+  if (!fine || fine <= new Date()) return;
+  const map = nonVotanti_(x.r, x.b);
+  const quanti = Object.keys(map).length;
+  if (!quanti) return;
+  const ore = Math.max(1, Math.round((fine.getTime() - new Date().getTime()) / 3600000));
+  const esito = spedisci_(c, x, map, oggetto_(c, x, 'mancano ' + ore + (ore === 1 ? ' ora' : ' ore') + ' per votare'),
+    function (c2, x2, nome, cod) { return testoSollecito_(c2, x2, nome, cod, fine); });
+  notifica_('Promemoria inviato a chi non ha votato',
+    'Mancano ' + ore + (ore === 1 ? ' ora' : ' ore') + ' alla chiusura di "' + ROUND[x.r].nome +
+    (x.b ? ' — ballottaggio ' + x.b : '') + '", prevista il ' + dataTesto_(fine) + '.\n\n' +
+    'Non avevano ancora votato in ' + quanti + '. Promemoria inviati: ' + esito.fatte + '.' +
+    (esito.senza.length ? '\n\nSenza indirizzo, da sollecitare a mano: ' + esito.senza.join(', ') : '') +
+    (esito.errori.length ? '\n\nNon partiti: ' + esito.errori.join('; ') : ''));
+}
+
+/** La chiusura programmata del contesto in corso, se c'e. */
+function scadenzaContesto_(c, x) {
+  if (x.b) return null;                       // i ballottaggi chiudono a ore, non a data fissa
+  const p = pianificazione_(c);
+  return x.r === 1 ? p.ch1 : x.r === 2 ? p.ch2 : null;
+}
+
+/** Il messaggio di sempre, con davanti la riga che dice quanto manca. */
+function testoSollecito_(c, x, nome, codice, fine) {
+  return 'Promemoria: ' + (x.r === 1 ? 'dalla vostra società' : 'da te') + ' non risulta ancora una scheda, ' +
+    'e la votazione si chiude il ' + dataTesto_(fine) + '.\n\n' + testoMessaggio_(c, x, nome, codice);
+}
+
 function chiusuraProgrammata_(r, b, fnTrigger, chiaveCfg) {
   const c = cfg_();
   const mancano = mancanti_(r, b);
@@ -1906,6 +1984,7 @@ function chiusuraProgrammata_(r, b, fnTrigger, chiaveCfg) {
   const nuova = new Date(new Date().getTime() + ore * 3600000);
   if (chiaveCfg) setCfg_(chiaveCfg, nuova);
   creaTrigger_(fnTrigger, nuova);
+  creaSolleciti_(nuova);
   notifica_('Mancano voti: chiusura prorogata',
     'La votazione "' + ROUND[r].nome + (b ? ' — ballottaggio ' + b : '') + '" doveva chiudersi ora, ma non hanno ancora votato tutti.\n\n' +
     'Non hanno votato (' + mancano.length + '):\n· ' + mancano.join('\n· ') + '\n\n' +
@@ -1956,7 +2035,10 @@ function proseguiDopoRound1_() {
     return;
   }
   apriRound_(2);
-  if (p.ch2 && p.ch2 > new Date(new Date().getTime() + 60000)) creaTrigger_('triggerChiudePresidente', p.ch2);
+  if (p.ch2 && p.ch2 > new Date(new Date().getTime() + 60000)) {
+    creaTrigger_('triggerChiudePresidente', p.ch2);
+    creaSolleciti_(p.ch2);
+  }
   notifica_('Commissari eletti: voto Presidente aperto',
     'Hanno votato tutte le società. I commissari eletti sono:\n' + elenco +
     '\n\nIl voto per il Presidente è aperto' + (p.ch2 ? ' e si chiuderà il ' + dataTesto_(p.ch2) : '') +
@@ -1969,7 +2051,10 @@ function triggerAprePresidente() {
   if (aperta_(c)) return;
   apriRound_(2);
   const p = pianificazione_(cfg_());
-  if (p.ch2 && p.ch2 > new Date(new Date().getTime() + 60000)) creaTrigger_('triggerChiudePresidente', p.ch2);
+  if (p.ch2 && p.ch2 > new Date(new Date().getTime() + 60000)) {
+    creaTrigger_('triggerChiudePresidente', p.ch2);
+    creaSolleciti_(p.ch2);
+  }
   const elenco = commissari_().map(x => '· ' + x.nome + ' — codice ' + x.codice + (link_(x.codice) ? ' — ' + link_(x.codice) : ' — link non disponibile (pubblica l\'app web)')).join('\n');
   notifica_(aperta_(cfg_()) ? 'Voto Presidente aperto' : 'Voto Presidente NON aperto',
     (aperta_(cfg_()) ? 'Il voto per il Presidente è aperto' + (p.ch2 ? ', chiusura prevista il ' + dataTesto_(p.ch2) : '') + '.\n\n'
@@ -2192,31 +2277,64 @@ function graduatoria_(c) {
   try { d = datiRound1_(c); } catch (e) { return []; }
   if (!d.lista.length || !d.schede.length) return [];
   const pres = String(c['Presidente'] || '').trim(), vice = String(c['Vice'] || '').trim();
-  const lista = d.lista.slice().sort((a, b) => {
-    if (!!a.rinuncia !== !!b.rinuncia) return a.rinuncia ? 1 : -1;      // le rinunce in coda
-    if (a.rinuncia) return a.nome.localeCompare(b.nome, 'it');           // fra loro, alfabetico
-    return b.voti - a.voti || b.anni - a.anni || a.nome.localeCompare(b.nome, 'it');
-  });
+  const maxA = maxAiuti_(c);
+  const voti = (a, b) => b.voti - a.voti || b.anni - a.anni || a.nome.localeCompare(b.nome, 'it');
+  const stato = x => String((d.ass.esito[x.nome] || {}).esito || '');
+  const vivi = d.lista.filter(x => !x.rinuncia);
+
+  // Tre blocchi, in quest'ordine: eletti, riserve, rinunce.
+  const eletti = vivi.filter(x => stato(x) === 'ELETTO').sort(voti);
+  const parita = vivi.filter(x => /^PARIT/i.test(stato(x))).sort(voti);
+  // Fra le riserve vale la stessa regola dell'elezione: allenatori e "Altro"
+  // per primi, gli aiuto allenatore solo quando non ne restano altri. Un
+  // allenatore con un voto solo subentra prima dell'aiuto piu votato.
+  const riserve = vivi.filter(x => stato(x) !== 'ELETTO' && !/^PARIT/i.test(stato(x)))
+    .sort((a, b) => (a.aiuto ? 1 : 0) - (b.aiuto ? 1 : 0) || voti(a, b));
+  const rinunce = d.lista.filter(x => x.rinuncia).sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
+  const aiutiEletti = eletti.filter(x => x.aiuto).length;
+
   const out = [];
   out.push({ riga: [''] });
   out.push({ riga: ['Graduatoria finale — ordine di scorrimento in caso di dimissioni'] });
   out.push({ testa: true, riga: ['Pos.', 'Candidato', 'Squadra', 'Preferenze', 'Posizione in graduatoria'] });
-  let scorre = 0;
-  lista.forEach((x, i) => {
-    const e = (d.ass.esito[x.nome] || {}).esito || '';
-    let stato;
-    if (x.rinuncia) stato = 'Rinuncia — in coda, fuori dallo scorrimento';
-    else if (e === 'ELETTO') stato = ['Commissario', x.nome === pres ? 'Presidente' : '', x.nome === vice ? 'Vice' : ''].filter(Boolean).join(' · ');
-    else if (/^PARIT/i.test(e)) stato = 'Parità da risolvere';
-    else { scorre++; stato = scorre + '° dei non eletti' + (scorre === 1 ? ' — subentra per primo' : ''); }
-    out.push({ riga: [i + 1, x.nome, x.squadra, x.voti, stato] });
+  // Un aiuto allenatore subentra solo quando non restano riserve allenatore o
+  // "Altro", e comunque fino al limite di aiuti in commissione. Oltre quel
+  // limite non si scorre: serve una deroga della CTN, oppure si rivota.
+  const postiAiuto = Math.max(0, maxA - aiutiEletti);
+  const riserveA = riserve.filter(x => !x.aiuto).length;
+  let usatiAiuto = 0;
+
+  let pos = 0, scorre = 0;
+  const riga = (x, testo) => out.push({ riga: [++pos, x.nome, x.squadra, x.voti, testo] });
+  eletti.forEach(x => riga(x, ['Commissario', x.nome === pres ? 'Presidente' : '', x.nome === vice ? 'Vice' : '',
+    x.aiuto ? 'aiuto allenatore (deroga)' : ''].filter(Boolean).join(' · ')));
+  parita.forEach(x => riga(x, 'Parità da risolvere'));
+  riserve.forEach(x => {
+    scorre++;
+    if (!x.aiuto) return riga(x, scorre + '° dei non eletti' + (scorre === 1 ? ' — subentra per primo' : ''));
+    const entro = usatiAiuto < postiAiuto;
+    if (entro) usatiAiuto++;
+    riga(x, scorre + '° dei non eletti — aiuto allenatore: ' + (entro
+      ? 'subentra solo se non restano allenatori o "Altro"'
+      : 'oltre il limite, subentra solo con deroga della CTN'));
   });
-  const rinunce = lista.filter(x => x.rinuncia).map(x => x.nome);
+  rinunce.forEach(x => riga(x, 'Rinuncia — in coda, fuori dallo scorrimento'));
+
+  const sostituzioni = riserveA + Math.min(postiAiuto, riserve.length - riserveA);
   out.push({ riga: [''] });
   out.push({ riga: ['In caso di dimissioni di un commissario subentra il primo dei non eletti, seguendo quest\'ordine. ' +
-    'A pari preferenze precede chi ha piu anni di tesseramento o incarichi.'] });
+    'A pari preferenze precede chi ha più anni di tesseramento o incarichi.'] });
+  out.push({ riga: ['Vale la stessa regola dell\'elezione: prima gli allenatori e i candidati di qualifica "Altro", ' +
+    'anche con una sola preferenza; un aiuto allenatore subentra solo quando non ne restano, e comunque entro il ' +
+    'limite di ' + maxA + (maxA === 1 ? ' aiuto allenatore' : ' aiuti allenatore') + ' in commissione (ora ' +
+    aiutiEletti + ').'] });
+  out.push({ riga: ['Sostituzioni possibili senza deroga: ' + sostituzioni +
+    ' (' + riserveA + ' fra allenatori e "Altro"' +
+    (postiAiuto && riserve.length > riserveA ? ', ' + Math.min(postiAiuto, riserve.length - riserveA) + ' fra gli aiuto allenatore' : '') +
+    '). Esaurite queste, per sostituire un commissario serve una deroga della Commissione Tecnica Nazionale (CTN), ' +
+    'oppure si torna al voto.'] });
   if (rinunce.length) out.push({ riga: ['Hanno dichiarato che non accetterebbero l\'incarico, e per questo sono in coda ' +
-    'alla graduatoria: ' + rinunce.join(', ') + '. I loro voti restano contati, ma non occupano un posto ' +
+    'alla graduatoria: ' + rinunce.map(x => x.nome).join(', ') + '. I loro voti restano contati, ma non occupano un posto ' +
     'e non subentrano in caso di dimissioni.'] });
   return out;
 }
@@ -2790,7 +2908,7 @@ function scriviLogo_(sh, riga, c) {
   if (!/^https:\/\//i.test(url)) return false;
   sh.getRange(riga, 1).setFormula('=IMAGE(' + SH.CONFIG + '!$B$' + cfgCell_('Logo fogli (PNG)').getRow() + ')')
     .setHorizontalAlignment('center').setVerticalAlignment('middle');
-  sh.setRowHeight(riga, 120);
+  sh.setRowHeight(riga, ALTEZZA_LOGO);
   return true;
 }
 
@@ -2798,6 +2916,7 @@ function scriviLogo_(sh, riga, c) {
 function scriviPiede_(sh, riga, c) {
   const logo = scriviLogo_(sh, riga, c);
   scriviLinkRepo_(sh, riga + (logo ? 1 : 0));
+  if (logo) sh.setRowHeight(riga, ALTEZZA_LOGO);
 }
 
 /** Riporta tutte le righe all'altezza standard (il logo alza la sua riga). */
@@ -2819,6 +2938,7 @@ const A4_LARGHEZZE = [180, 110, 250, 120];                       // resoconti a 
 const A4_RISULTATI = [55, 130, 85, 110, 60, 60, 75, 85];         // "Risultati" (8 colonne)
 const A4_CARICA = [55, 140, 120, 50, 65, 100, 130];              // Presidente e Vice (7 colonne)
 const A4_REPORT = [140, 165, 130, 85, 140];                      // Report, con la graduatoria (5 colonne)
+const ALTEZZA_LOGO = 120;                                        // pixel della riga che contiene il logo
 
 function formatoA4_(sh, righe, larghezze) {
   const colonne = larghezze.length;
@@ -2836,6 +2956,21 @@ function formatoA4_(sh, righe, larghezze) {
     try { sh.getRange(i + 1, 1, 1, colonne).merge(); } catch (e) {}
   });
   try { sh.autoResizeRows(1, n); } catch (e) {}
+  altezzaLoghi_(sh);
+}
+
+/**
+ * Rimette ai loghi la loro altezza. Va fatto DOPO autoResizeRows, che altrimenti
+ * riporta la riga all'altezza del testo - e in una riga che contiene solo una
+ * formula IMAGE il testo non c'e, quindi il logo si schiaccia a una striscia.
+ */
+function altezzaLoghi_(sh) {
+  try {
+    const n = Math.min(Math.max(sh.getLastRow(), 1), sh.getMaxRows());
+    sh.getRange(1, 1, n, 1).getFormulas().forEach((r, i) => {
+      if (/^=IMAGE\(/i.test(String(r[0] || ''))) sh.setRowHeight(i + 1, ALTEZZA_LOGO);
+    });
+  } catch (e) { /* niente formule leggibili: si lascia com'e */ }
 }
 
 function aperta_(c) { return String(c['Stato']).trim().toUpperCase() === 'APERTA'; }

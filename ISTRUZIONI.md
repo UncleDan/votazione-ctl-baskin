@@ -1,4 +1,4 @@
-# Votazione CTL Baskin — istruzioni (v31)
+# Votazione CTL Baskin — istruzioni (v34)
 
 Voto online anonimo, utilizzabile da telefono senza account Google:
 
@@ -107,7 +107,15 @@ Avvisa comunque le società per email: il programma non può dirlo sulla scheda 
 
 Il *Report* chiude con la **graduatoria finale del round 1**: tutti i candidati in ordine, con preferenze e posizione. Serve per il verbale, e serve soprattutto dopo: se un commissario si dimette, subentra il primo dei non eletti seguendo quell'ordine, e averlo messo nero su bianco il giorno dello spoglio evita di doverlo ricostruire mesi più tardi.
 
-L'ordine è quello dei risultati — preferenze, poi anni di tesseramento a parità — con due regole in più: **chi ha rinunciato va in coda**, fuori dallo scorrimento, e **fra più rinunce vale l'ordine alfabetico**, perché fra loro non c'è nulla da graduare. Ogni riga dice cosa quella posizione significa: *Commissario*, *1° dei non eletti — subentra per primo*, *Rinuncia*. Sotto la tabella la regola dello scorrimento è scritta a chiare lettere, così il verbale si spiega da sé.
+La tabella è in tre blocchi: prima gli **eletti**, dal più votato in giù; poi le **riserve**, nell'ordine in cui subentrano; infine le **rinunce**, in ordine alfabetico, perché fra loro non c'è nulla da graduare.
+
+Fra le riserve vale **la stessa regola dell'elezione**, ed è il punto che conta: prima gli allenatori e i candidati di qualifica `Altro`, **anche con una sola preferenza**, e solo quando non ne restano gli aiuto allenatore. Un allenatore con un voto subentra prima dell'aiuto allenatore più votato — altrimenti la sostituzione contraddirebbe la regola che ha deciso l'elezione. Resta il limite di *Max aiuti allenatore* in commissione, e la tabella lo ricorda.
+
+Il limite di *Max aiuti allenatore* vale anche per lo scorrimento: un aiuto subentra solo se in commissione ce ne sono meno del limite. Gli aiuti oltre quel limite restano in graduatoria ma sono segnati come **subentrabili solo con deroga della Commissione Tecnica Nazionale (CTN)**.
+
+Sotto la tabella il Report scrive **quante sostituzioni reggono senza deroga**, divise fra allenatori e aiuti: *«Sostituzioni possibili senza deroga: 2 (1 fra allenatori e "Altro", 1 fra gli aiuto allenatore). Esaurite queste, per sostituire un commissario serve una deroga della Commissione Tecnica Nazionale (CTN), oppure si torna al voto.»* È il numero da avere in mente quando arrivano le dimissioni: dice subito se la commissione regge o se bisogna muoversi.
+
+Ogni riga dice cosa quella posizione significa: *Commissario*, *1° dei non eletti — subentra per primo*, *2° dei non eletti — aiuto allenatore: subentra solo se non restano allenatori o "Altro"*, *3° dei non eletti — aiuto allenatore: oltre il limite, subentra solo con deroga della CTN*, *Rinuncia*. Sotto la tabella le regole sono scritte a chiare lettere, così il verbale si spiega da sé.
 
 ## Qualifiche e autocandidature
 
@@ -178,6 +186,16 @@ Con un indirizzo presente hai due strade.
 **Le date sono nel messaggio**, se la votazione è programmata: preparandolo prima dell'apertura si legge *«La votazione apre il 16/11/2026 09:00. Si chiude il 23/11/2026 20:00.»*, e nella mail automatica dell'apertura *«La votazione si chiude il 23/11/2026 20:00.»* Sono le date del round di quel messaggio, non di quello in corso: i messaggi del Presidente preparati mentre si vota per i Commissari portano le date del round 2. Se non hai programmato niente, la riga non compare e la chiusura va comunicata a parte.
 
 **L'oggetto dice di quale votazione si tratta** — *Elezione CTL Baskin — Presidente: il link per votare* — e cambia a ogni round e a ogni ballottaggio. Chi riceve il secondo o il terzo messaggio ha già votato una volta: con un oggetto sempre uguale lo scambierebbe per un doppione e lo lascerebbe lì.
+
+### I promemoria prima della chiusura
+
+Con la votazione programmata, il sistema manda da solo un promemoria **a chi non ha ancora votato**, a poche ore dalla scadenza. Di base a **4 ore e 2 ore** prima; si cambia in *Config → Solleciti prima della chiusura (ore)* scrivendo gli anticipi separati da virgola (per esempio `24, 6, 1`), e lasciando il campo vuoto non ne parte nessuno.
+
+Il messaggio è quello di sempre — link personale, codice, preferenze — con davanti la riga che dice perché arriva: *«dalla vostra società non risulta ancora una scheda, e la votazione si chiude il…»*. L'oggetto dice quanto manca.
+
+Non parte se hanno già votato tutti, se la votazione è chiusa o se la chiusura non è programmata. I promemoria si rifanno da soli quando la chiusura si sposta per proroga, e cadono se chiudi a mano. Chi non ha indirizzo email resta da sollecitare a voce: te lo dice la notifica che ricevi a ogni invio, insieme all'elenco di chi è stato sollecitato.
+
+I ballottaggi non hanno una data di chiusura ma una durata in ore, quindi lì i promemoria non si applicano.
 
 ### L'avviso automatico all'apertura
 

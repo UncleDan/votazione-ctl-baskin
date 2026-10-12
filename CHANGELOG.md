@@ -1,5 +1,23 @@
 # Changelog
 
+## v34
+- **Il limite di aiuti allenatore vale anche per lo scorrimento.** Un aiuto subentra solo quando non restano riserve allenatore o `Altro` **e** in commissione ce ne sono meno del limite di *Max aiuti allenatore*. Gli aiuti oltre il limite restano in graduatoria, segnati come subentrabili solo con deroga della Commissione Tecnica Nazionale.
+- **Il Report dice quante sostituzioni reggono senza deroga**, divise fra allenatori e aiuti, e che cosa fare quando finiscono: deroga della CTN oppure nuovo voto. È il numero da avere in mente quando arrivano le dimissioni.
+- Nuova simulazione `test/simulazione-scorrimento.js`.
+
+## v33
+- **Lo scorrimento segue la stessa regola dell'elezione.** Prima la graduatoria ordinava le riserve per sole preferenze: un aiuto allenatore molto votato finiva sopra un allenatore con poche preferenze, e in caso di dimissioni sarebbe subentrato lui — contraddicendo la regola che aveva deciso l'elezione. Ora fra le riserve vengono prima gli allenatori e i candidati di qualifica `Altro`, **anche con una sola preferenza**, e solo quando non ne restano gli aiuto allenatore. La nota sotto la tabella lo dice, e ricorda il limite di aiuti in commissione.
+- **La graduatoria è in tre blocchi dichiarati**: eletti dal più votato in giù, riserve nell'ordine di ripescaggio, rinunce in coda in ordine alfabetico.
+- **La riga del logo torna alta 120 pixel.** L'avevo impostata, ma `autoResizeRows` del formato A4 la riportava subito all'altezza del testo — e in una riga che contiene solo una formula `IMAGE` il testo non c'è, quindi il logo si schiacciava a una striscia. Ora l'altezza si rimette dopo il ridimensionamento, su tutti i fogli e sia in testa sia nel piede.
+
+ v32
+- **Promemoria automatici a chi non ha ancora votato**, a poche ore dalla chiusura programmata: di base 4 ore e 2 ore prima, configurabili in *Config → Solleciti prima della chiusura (ore)* con un elenco di anticipi separati da virgola. Campo vuoto, nessun promemoria.
+  - Va solo a chi non risulta aver votato, con il messaggio di sempre e davanti la riga che spiega perché arriva; l'oggetto dice quanto manca.
+  - Non parte se hanno votato tutti, se la votazione è chiusa o se la chiusura non è programmata.
+  - Si riprogrammano da soli quando la chiusura slitta per proroga, e cadono se chiudi a mano.
+  - A ogni invio ricevi una notifica con chi è stato sollecitato e chi è rimasto senza indirizzo.
+- Nuova simulazione `test/simulazione-solleciti.js`.
+
 ## v31
 - **Nella richiesta di conferma c'è l'indirizzo a cui rispondere**, e la precisazione che non serve nessun modulo: basta una mail alla Sezione Territoriale. A chi non ha candidature il messaggio elenca anche cosa scrivere — nome e cognome, qualifica, squadra, anni di tesseramento — così la risposta arriva completa invece di aprire un giro di chiarimenti.
 - Nuovo parametro *Config → Indirizzo per le candidature*. Vuoto vale l'account che possiede il foglio, ma conviene fissarlo: aprendo il foglio con un altro account quell'indirizzo cambierebbe senza darlo a vedere.

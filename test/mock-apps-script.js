@@ -27,6 +27,7 @@ Sheet.prototype = {
       setWrap() { return R; }, setVerticalAlignment() { return R; }, setHorizontalAlignment() { return R; },
       setDataValidation() { return R; }, setNumberFormat() { return R; },
       setFormula(f) { sh.cell(r, c)[c - 1] = f; return R; },
+      getFormulas() { return R.getValues().map(a2 => a2.map(x => /^=/.test(String(x)) ? String(x) : '')); },
       getRow() { return r; }, getColumn() { return c; },
       merge() { return R; }, breakApart() { return R; }
     };
@@ -35,7 +36,8 @@ Sheet.prototype = {
   appendRow(a) { this.d.splice(this.getLastRow(), 0, a.slice()); },
   clearContents() { this.d = []; }, clear() { this.d = []; },
   insertColumnsAfter(c, n) { this.d.forEach(r => { while (r.length < c) r.push(''); r.splice(c, 0, ...Array(n).fill('')); }); },
-  setFrozenRows() {}, autoResizeColumns() {}, autoResizeRows() {}, activate() {}, setRowHeight() {}, setRowHeights() {},
+  setFrozenRows() {}, autoResizeColumns() {}, autoResizeRows() {}, activate() {},
+  setRowHeight(r, h) { this.h = this.h || {}; this.h[r] = h; }, setRowHeights() {},
   setColumnWidth() {}, setColumnWidths() {}, hideColumns() {}
 };
 

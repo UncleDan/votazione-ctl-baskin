@@ -14,6 +14,7 @@ Funziona con un Foglio Google e Google Apps Script: nessun server da gestire, ne
 - **Codici** nel formato `XXXX-9999` (quattro lettere A–H e quattro cifre), generabili e rigenerabili senza azzerare società, squadre, candidati o voti già espressi.
 - **Formatore di riferimento** indicato senza votazione (votante solo se si candida, con `Autocandidatura` al posto della squadra).
 - **Tre azzeramenti**: *solo i risultati* (si rivota con gli stessi codici e gli stessi link), *tutto* (via anche società, squadre e candidati, per una nuova elezione) e *tutto più dati di prova*. Nessuno tocca la pubblicazione della app web, quindi lo stesso foglio e lo stesso indirizzo servono per tutte le votazioni successive e per quante prove vuoi.
+- **Promemoria automatici**: a poche ore dalla chiusura (di base 4 e 2) chi non ha ancora votato riceve di nuovo il suo link.
 - **Conferma delle candidature**: prima di aprire, ogni società riceve l'elenco dei propri candidati con le relative note e lo conferma o lo corregge; chi non ha candidature lo scopre in tempo per rimediare.
 - **Rinuncia**: un candidato può dichiarare, anche a votazione aperta, che non accetterebbe l'incarico. Resta sulla scheda e i suoi voti si contano, ma il posto scorre al successivo. Vale anche per Presidente e Vice.
 - **Una società, un solo candidato**: la regola è controllata, e il round 1 non si apre finché qualcuno ne presenta due. Gli autocandidati, non tesserati con nessun club, sono esclusi dal conteggio.

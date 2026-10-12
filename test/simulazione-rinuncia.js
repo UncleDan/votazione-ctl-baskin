@@ -88,6 +88,15 @@ verifica(rep.some(r => /dimissioni di un commissario subentra il primo dei non e
 verifica(rep.some(r => /non accetterebbero l'incarico/.test(r[0]) && /Candidato A/.test(r[0])),
   'la rinuncia e verbalizzata con il nome');
 
+// ---- l'ordine: eletti per voti, poi le riserve nell'ordine di ripescaggio ----
+console.log('\n=== Ordine della graduatoria');
+const vociEl = grad.filter(r => /Commissario/.test(r[4])).map(r => Number(r[3]));
+verifica(vociEl.every((v, k) => k === 0 || v <= vociEl[k - 1]),
+  'gli eletti sono in ordine di preferenze decrescenti: ' + vociEl.join(' ≥ '));
+const iPrimaRiserva = grad.findIndex(r => /dei non eletti/.test(r[4]));
+verifica(iPrimaRiserva === vociEl.length, 'le riserve vengono dopo tutti gli eletti');
+verifica(grad.findIndex(r => /Rinuncia/.test(r[4])) > iPrimaRiserva, 'e le rinunce dopo le riserve');
+
 // due rinunce: fra loro in ordine alfabetico
 sheet_('Candidati').getRange(4, colRin).setValue(true);     // Candidato C rinuncia
 aggiornaReport();

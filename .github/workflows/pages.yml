@@ -1,0 +1,79 @@
+name: Pubblica la scheda su GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scheda-html/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  pubblica:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # L'indirizzo del ponte Apps Script non sta nel codice: arriva dalla
+      # variabile PONTE del repository (Settings -> Secrets and variables ->
+      # Actions -> Variables). Cosi quando ridistribuisci lo script e l'URL
+      # cambia, aggiorni la variabile invece di modificare la pagina.
+      #
+      # Entra nella pagina codificato in base64. Non e cifratura: la pagina deve
+      # usarlo, quindi deve poterlo leggere, e chi apre gli strumenti per
+      # sviluppatori lo vede comunque nella prima chiamata. Serve solo a non
+      # lasciarlo in chiaro nel sorgente, dove lo raccoglierebbe qualunque
+      # crawler a caccia di endpoint Apps Script. Per lo stesso motivo il log di
+      # questo passo non lo stampa: su un repository pubblico il log e pubblico.
+      - name: Inserisci l'indirizzo del ponte
+        env:
+          PONTE_URL: ${{ vars.PONTE }}
+        run: |
+          if [ -z "$PONTE_URL" ]; then
+            echo "::warning::Manca la variabile PONTE del repository (l'URL /exec della web app Apps Script)."
+            echo "::warning::La pagina viene pubblicata lo stesso, ma finche' la variabile non c'e' non si puo' votare:"
+            echo "::warning::impostala in Settings -> Secrets and variables -> Actions -> Variables, poi rilancia il workflow."
+            exit 0
+          fi
+          python3 - "$PONTE_URL" <<'PY'
+          import sys, pathlib, base64
+          p = pathlib.Path("scheda-html/index.html")
+          t = p.read_text(encoding="utf-8")
+          if "__PONTE__" not in t:
+              sys.exit("Segnaposto __PONTE__ non trovato in scheda-html/index.html")
+          url = sys.argv[1].strip()
+          if not url.startswith("https://"):
+              sys.exit("La variabile PONTE non e' un indirizzo https://")
+          b64 = base64.b64encode(url.encode("utf-8")).decode("ascii")
+          p.write_text(t.replace("__PONTE__", b64), encoding="utf-8")
+          print("Ponte inserito (base64, %d caratteri). L'indirizzo non viene stampato apposta." % len(b64))
+          PY
+
+      # Pages va acceso UNA VOLTA a mano, in Settings -> Pages -> Source: GitHub
+      # Actions. Non si puo' automatizzare: creare il sito Pages dall'API richiede
+      # diritti di amministrazione che il GITHUB_TOKEN del workflow non ha, e con
+      # "enablement: true" il passo fallisce con "Resource not accessible by
+      # integration". Se invece l'errore e' "Get Pages site failed - Not Found",
+      # vuol dire che Pages non e' ancora acceso.
+      - uses: actions/configure-pages@v5
+
+      # Va in rete solo questa cartella: il resto del repository (Code.gs,
+      # documentazione, test) resta nel repo ma non viene pubblicato.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: scheda-html
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
