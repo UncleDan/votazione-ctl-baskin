@@ -1,6 +1,6 @@
 /**
  * Votazione CTL Baskin — voto online anonimo, un voto per società
- * v34 — Google Apps Script legato a un Foglio Google
+ * v35 — Google Apps Script legato a un Foglio Google
  *
  * Codice sorgente: https://github.com/UncleDan/votazione-ctl-baskin
  * Copyright (c) 2026 Daniele Lolli (UncleDan) — Licenza MIT (vedi LICENSE)
@@ -35,7 +35,7 @@ const SH = {
   MSG: 'Messaggi', CONF: 'Conferme candidature'
 };
 const REPO_URL = 'https://github.com/UncleDan/votazione-ctl-baskin';
-const VERSIONE = 'v34';
+const VERSIONE = 'v35';
 const LOGO_SVG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg';
 const LOGO_PNG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png';
 const PROPRIETA_LOGO = 'Logo © Ente Italiano Sport Inclusivi (EISI), tutti i diritti riservati';
@@ -920,9 +920,9 @@ function testoMessaggio_(c, x, nome, codice) {
   r.push('');
   r.push('IMPORTANTE — Dopo aver depositato la scheda compare una RICEVUTA, un codice tipo 7K2M-94QD. ' +
     (soc ? 'Fatele' : 'Falle') + ' subito uno screenshot, oppure ' + (soc ? 'trascrivetela' : 'trascrivila') +
-    ': non è recuperabile, chiusa la pagina non la conosce più nessuno. A spoglio concluso ' +
-    (soc ? 'la ritroverete' : 'la ritroverai') + ' nel riepilogo dell\'urna, e vorrà dire che ' +
-    (soc ? 'la vostra scheda è' : 'la tua scheda è') + ' stata contata. La ricevuta non dice come ' +
+    ': non è recuperabile, chiusa la pagina non la conosce più nessuno. ' +
+    (soc ? 'La ritroverete' : 'La ritroverai') + ' nel riepilogo dell\'urna — anche prima della chiusura — e vorrà ' +
+    'dire che ' + (soc ? 'la vostra scheda è' : 'la tua scheda è') + ' stata contata. La ricevuta non dice come ' +
     (soc ? 'avete' : 'hai') + ' votato: è proprio questo che tiene il voto anonimo.');
   r.push('');
   r.push('Il programma è pubblico e verificabile da chiunque: ' + REPO_URL);
@@ -2377,7 +2377,20 @@ function aggiornaUrna() {
     push(R('Codici usati', used.size));
     push(R('Schede nell\'urna', schede.length,
       schede.length === used.size ? 'Controllo OK: schede = codici usati' : 'ANOMALIA: schede e codici usati non coincidono'));
-    if (inCorso) { push(R('Conteggi e schede visibili dopo la chiusura.')); return; }
+    // Le ricevute si vedono anche a votazione aperta: chi ha votato puo
+    // controllare subito, senza aspettare lo spoglio. Non svelano nulla del
+    // voto - stanno in un elenco separato da quello delle schede, mescolato a
+    // parte - e qui sono in ordine alfabetico, non di arrivo.
+    if (ric && ric.length) {
+      // Una per cella, in griglia sulle quattro colonne: prima stavano tutte
+      // stipate in una cella sola, e per trovare la propria bisognava andare a caccia.
+      push(R('Ricevute di voto — ' + ric.length + (ric.length === 1 ? ' scheda' : ' schede') +
+        ', in ordine alfabetico'), 'b');
+      for (let i = 0; i < ric.length; i += W) push(R.apply(null, ric.slice(i, i + W)));
+      push(R('Ogni votante cerchi qui la ricevuta avuta al momento del voto: trovarla significa che la sua scheda ' +
+        'e nell\'urna ed e stata contata. Non dice come ha votato, e non corrisponde al numero di scheda.'));
+    }
+    if (inCorso) { push(R('Conteggi e schede visibili dopo la chiusura: le ricevute, invece, si vedono gia adesso.')); return; }
     push(R('Schede bianche', schede.filter(s => !s.length).length));
     const voti = {};
     nomi.forEach(n => voti[n] = 0);
@@ -2387,11 +2400,7 @@ function aggiornaUrna() {
       .forEach(n => push(R(n, voti[n], nomi.indexOf(n) < 0 ? 'Non presente tra i candidati' : '')));
     push(R('Scheda n. (ordine casuale)', 'Preferenze'), 'b');
     schede.forEach((s, i) => push(R(i + 1, s.length ? s.join(', ') : '(bianca)')));
-    if (ric && ric.length) {
-      push(R('Ricevute di voto (ordine alfabetico)', ric.join('  ·  '),
-        'Ogni votante trova qui la propria: vuol dire che la sua scheda e nell\'urna ed e stata contata. ' +
-        'La ricevuta non dice come ha votato e non corrisponde al numero di scheda qui sopra.'));
-    }
+
   }
 
   const rAtt = roundAttivo_(c), bAtt = ballottaggioAttivo_(c);

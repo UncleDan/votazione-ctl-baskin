@@ -1,5 +1,11 @@
 # Changelog
 
+## v35
+- **Le ricevute si vedono anche a votazione aperta**, non più solo dopo lo spoglio: chi ha votato controlla subito che la sua scheda sia nell'urna. Conteggi e schede restano nascosti fino alla chiusura.
+- **Una ricevuta per cella, in griglia sulle quattro colonne.** Prima stavano tutte stipate in un'unica cella larga poco più di un centimetro: c'erano, ma per trovare la propria bisognava andare a caccia — che era poi il motivo per cui sembravano non esserci.
+- Il messaggio ai votanti lo dice: la ricevuta si ritrova nel riepilogo dell'urna **anche prima della chiusura**.
+- Nota onesta nelle istruzioni: a urna aperta il foglio mostra sia chi ha votato sia le ricevute, quindi guardandolo in due momenti si può abbinare un nome a una ricevuta. Non svela come ha votato — ricevute e schede sono in due elenchi separati e mescolati a parte — ma chi preferisce evitarlo aggiorna il Riepilogo urna solo a votazione chiusa.
+
 ## v34
 - **Il limite di aiuti allenatore vale anche per lo scorrimento.** Un aiuto subentra solo quando non restano riserve allenatore o `Altro` **e** in commissione ce ne sono meno del limite di *Max aiuti allenatore*. Gli aiuti oltre il limite restano in graduatoria, segnati come subentrabili solo con deroga della Commissione Tecnica Nazionale.
 - **Il Report dice quante sostituzioni reggono senza deroga**, divise fra allenatori e aiuti, e che cosa fare quando finiscono: deroga della CTN oppure nuovo voto. È il numero da avere in mente quando arrivano le dimissioni.

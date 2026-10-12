@@ -54,6 +54,15 @@ verifica(schede_(1, 0).length === 0, 'urna ancora vuota: nessuna scheda è entra
 
 verifica(inviaVoto(cod[0], ['Candidato A'], getInfo().ctx).ok === true, 'dalla app Google la scheda entra');
 verifica(schede_(1, 0).length === 1, 'urna: 1 scheda');
+// le ricevute si vedono gia a votazione aperta
+aggiornaUrna();
+const urna = foglio('Riepilogo urna').d.map(r => r.map(x => String(x == null ? '' : x)));
+const iRic = urna.findIndex(r => /^Ricevute di voto/.test(r[0]));
+verifica(iRic > 0, 'il Riepilogo urna elenca le ricevute anche a votazione aperta');
+verifica(ricevute_(1, 0).every(k => urna.some(r => r.indexOf(k) >= 0)),
+  'e ci sono tutte quelle depositate finora');
+verifica(urna.some(r => /Conteggi e schede visibili dopo la chiusura/.test(r[0])),
+  'mentre conteggi e schede restano nascosti fino alla chiusura');
 verifica(/\?c=/.test(foglio('Società').d[1][2]), 'il link della società punta alla app: ' + foglio('Società').d[1][2]);
 
 // ---------------- Passaggio a HTML ----------------

@@ -1,4 +1,4 @@
-# Votazione CTL Baskin — istruzioni (v34)
+# Votazione CTL Baskin — istruzioni (v35)
 
 Voto online anonimo, utilizzabile da telefono senza account Google:
 
@@ -154,7 +154,9 @@ Se ti serve la via di mezzo — stessi iscritti ma codici nuovi, per esempio per
 
 Chi deposita la scheda riceve un codice tipo `7K2M-94QD`, mostrato in grande con l'invito a fare uno screenshot o a trascriverlo. **Non è recuperabile**: non è scritto da nessuna parte accanto al nome del votante, quindi chiusa la pagina non lo conosce più nessuno, nemmeno tu.
 
-A spoglio concluso le ricevute compaiono nel foglio **Riepilogo urna**, in fondo a ogni round, in ordine alfabetico. Chi ritrova la propria sa che la sua scheda è nell'urna ed è stata contata.
+Le ricevute compaiono nel foglio **Riepilogo urna**, una per cella e in ordine alfabetico, **già a votazione aperta**: chi ha votato può controllare subito, senza aspettare lo spoglio. Conteggi e schede restano invece nascosti fino alla chiusura.
+
+Una conseguenza da conoscere, perché è il prezzo di questa comodità: a urna aperta il foglio mostra sia *chi ha votato* sia le ricevute, quindi chi lo guarda in due momenti diversi può abbinare un nome comparso a una ricevuta comparsa. Non svela **come** ha votato — ricevute e schede stanno in due elenchi separati, mescolati l'uno indipendentemente dall'altro — ma se preferisci che nessuno possa fare quell'abbinamento, aggiorna il Riepilogo urna solo a votazione chiusa.
 
 Quello che la ricevuta **non** fa è dire come si è votato: è generata a caso al momento del deposito, non deriva né dal codice del votante né dalle preferenze, e sta in un elenco separato da quello delle schede, mescolato per conto suo. Nemmeno confrontando le posizioni nei due elenchi si può legare una ricevuta a una scheda. È la condizione perché resti un voto anonimo e insieme verificabile.
 
