@@ -1,6 +1,6 @@
 /**
  * Votazione CTL Baskin — voto online anonimo, un voto per società
- * v37 — Google Apps Script legato a un Foglio Google
+ * v39 — Google Apps Script legato a un Foglio Google
  *
  * Codice sorgente: https://github.com/UncleDan/votazione-ctl-baskin
  * Copyright (c) 2026 Daniele Lolli (UncleDan) — Licenza MIT (vedi LICENSE)
@@ -32,16 +32,17 @@ const SH = {
   CONFIG: 'Config', SOC: 'Società', SQ: 'Squadre', CAND: 'Candidati', RIS: 'Risultati',
   COM: 'Commissari', BAL: 'Ballottaggio', RB: 'Risultati ballottaggi',
   RP: 'Risultati Presidente', RV: 'Risultati Vice', REP: 'Verbale', URNA: 'Riepilogo urna',
-  MSG: 'Messaggi', CONF: 'Conferme candidature'
+  MSG: 'Messaggi', CONF: 'Conferme'
 };
 const REPO_URL = 'https://github.com/UncleDan/votazione-ctl-baskin';
-const VERSIONE = 'v37';
+const VERSIONE = 'v39';
 const LOGO_SVG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg';
 const LOGO_PNG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png';
 const PROPRIETA_LOGO = 'Logo © Ente Italiano Sport Inclusivi (EISI), tutti i diritti riservati';
 const P_SALT = 'SALT';
 const P_AVVISO = 'AVVISO_APERTURA';   // una sola mail di apertura per contesto
-const P_MSG = 'MSG_CTX';              // per quale round e preparato il foglio "Messaggi"
+const P_MSG = 'MSG_CTX';
+const P_CONF = 'CONF_CTX';           // di che conferma parla il foglio "Conferme"              // per quale round e preparato il foglio "Messaggi"
 const MAX_BALLOTTAGGI = 3;
 const ROUND = {
   1: { nome: 'Commissari CTL', ballots: 'BALLOTS', used: 'USED', ric: 'RIC', prefisso: 'Stai votando per la società: ' },
@@ -55,7 +56,7 @@ const COM_HEADER = ['Commissario', 'Qualifica', 'Squadra', 'Codice', 'Link diret
 const BAL_HEADER = ['Votante', 'Codice ballottaggio', 'Link diretto di voto', 'Ha votato'];
 const RIS_HEADER = ['Posizione', 'Candidato', 'Qualifica', 'Squadra', 'Preferenze', 'Anni (spareggio)', 'Esito', 'Note'];
 const MSG_HEADER = ['Destinatario', 'Codice', 'Email', 'Messaggio da copiare e incollare', 'Rimanda'];
-const CONF_HEADER = ['Società', 'Email', 'Candidati che risultano', 'Messaggio da copiare e incollare', 'Da inviare'];
+const CONF_HEADER = ['Destinatario', 'Email', 'Riguarda', 'Messaggio da copiare e incollare', 'Da inviare'];
 const LETTERE = 'ABCDEFGH';      // codici: 4 lettere A–H
 const CIFRE = '0123456789';      // + 4 cifre, nel formato XXXX-9999
 const FUSO = 'Europe/Rome';
@@ -70,7 +71,8 @@ const INTERFACCE = ['Semplice', 'HTML'];   // una sola attiva per votazione
 const CFG_INTERFACCIA = 'Interfaccia di voto';
 const CFG_URL_HTML = 'Indirizzo interfaccia HTML';
 const CFG_MITTENTE = 'Mittente email';
-const CFG_SCADENZA = 'Scadenza conferma candidature';
+const CFG_SCADENZA = 'Scadenza per le conferme';
+const CFG_ORE_INCARICO = 'Ore per confermare l\'incarico';
 const CFG_INDIRIZZO = 'Indirizzo per le candidature';
 const CFG_SOLLECITI = 'Solleciti prima della chiusura (ore)';
 
@@ -106,8 +108,13 @@ function onOpen() {
       .addItem('Programma apertura e chiusura', 'programmaVotazioni')
       .addItem('Mostra pianificazione', 'mostraPianificazione')
       .addItem('Annulla pianificazione', 'annullaPianificazione'))
-    .addSubMenu(ui.createMenu('Candidature')
-      .addItem('Prepara le richieste di conferma', 'preparaConferme')
+    .addSubMenu(ui.createMenu('Richieste e conferme')
+      .addItem('1. Apri la raccolta delle candidature', 'richiestaCandidature')
+      .addItem('2. Chiedi conferma delle candidature', 'preparaConferme')
+      .addItem('3. Chiedi ai commissari se accettano l\'incarico', 'preparaConfermeCommissari')
+      .addSeparator()
+      .addItem('Chiedi candidati alle società senza commissario', 'richiestaCandidatureScoperte')
+      .addSeparator()
       .addItem('Invia le richieste per email…', 'inviaConferme'))
     .addSubMenu(ui.createMenu('Messaggi ai votanti')
       .addItem('Prepara i messaggi del round attivo', 'preparaMessaggiMenu')
@@ -217,7 +224,8 @@ function setup() {
     [CFG_INTERFACCIA, 'HTML', 'Da dove si vota: Semplice = app Google; HTML = pagina su GitHub Pages. Una sola per votazione, gestita dal menu'],
     [CFG_URL_HTML, '', 'Indirizzo della pagina su GitHub Pages. Serve solo con l\'interfaccia HTML: entra nei link inviati ai votanti'],
     [CFG_MITTENTE, '', 'Nome del mittente delle email ai votanti. Vuoto = "Sezione Territoriale Baskin EISI " piu la Sezione. L\'indirizzo resta quello del tuo account Google'],
-    [CFG_SCADENZA, '', 'Entro quando le societa devono confermare le candidature (testo libero, es. "venerdi 7 novembre"). Compare nella richiesta di conferma'],
+    [CFG_SCADENZA, '', 'Entro quando rispondere alle richieste di candidatura e conferma (testo libero, es. "venerdi 7 novembre"). Compare nel messaggio'],
+    [CFG_ORE_INCARICO, '6', 'Quante ore hanno i commissari eletti per confermare l\'incarico. Il messaggio riporta data e ora precise'],
     [CFG_INDIRIZZO, '', 'Indirizzo a cui le societa mandano candidature e conferme. Vuoto = l\'account che possiede il foglio'],
     [CFG_SOLLECITI, '4, 2', 'Quante ore prima della chiusura mandare il promemoria a chi non ha votato. Separate da virgola, vuoto = nessun sollecito']
   ].forEach(r => ensureCfgRow_(r[0], r[1], r[2]));
@@ -228,6 +236,7 @@ function setup() {
     .forEach(k => cfgCell_(k).setNumberFormat('dd/mm/yyyy hh:mm'));
 
   migraNomiFogli_(ss);
+  cfgRename_('Scadenza conferma candidature', CFG_SCADENZA);
   assicuraIntestazione_(ensureSheet_(ss, SH.SOC, SOC_HEADER), SOC_HEADER);
   ensureSheet_(ss, SH.SQ, SQ_HEADER);
   const cand = assicuraIntestazione_(ensureSheet_(ss, SH.CAND, CAND_HEADER), CAND_HEADER);
@@ -350,7 +359,7 @@ function assicuraIntestazione_(sh, header) {
 
 /** Rinomina i fogli che hanno cambiato nome fra una versione e l'altra. */
 function migraNomiFogli_(ss) {
-  const vecchi = { 'Report': SH.REP };
+  const vecchi = { 'Report': SH.REP, 'Conferme candidature': SH.CONF };
   Object.keys(vecchi).forEach(v => {
     const sh = ss.getSheetByName(v);
     if (sh && !ss.getSheetByName(vecchi[v])) sh.setName(vecchi[v]);
@@ -964,7 +973,182 @@ function testoMessaggio_(c, x, nome, codice) {
   return r.join('\n');
 }
 
-/* ================= Conferma delle candidature ================= */
+/* ================= Richieste e conferme ================= */
+
+/**
+ * Scrive le richieste nel foglio "Conferme" e ricorda di che richiesta si
+ * tratta: l'oggetto della mail dipende da questo, e il foglio e sempre lo
+ * stesso perche di richieste in giro ce n'e una alla volta.
+ */
+function scriviConferme_(ss, righe, quale) {
+  const sh = svuotaFoglio_(ss, SH.CONF, CONF_HEADER);
+  if (righe.length) {
+    sh.getRange(2, 1, righe.length, CONF_HEADER.length).setValues(righe);
+    sh.getRange(2, 4, righe.length, 1).setWrap(true).setVerticalAlignment('top');
+    sh.getRange(2, 5, righe.length, 1).setDataValidation(
+      SpreadsheetApp.newDataValidation().requireCheckbox().build()).setHorizontalAlignment('center');
+  }
+  [220, 230, 220, 600, 90].forEach((w, i) => sh.setColumnWidth(i + 1, w));
+  PropertiesService.getScriptProperties().setProperty(P_CONF, quale);
+  sh.activate();
+  return sh;
+}
+
+/**
+ * Apre la raccolta: chiede a ogni societa di presentare il suo candidato.
+ * E il primo passo di tutta la procedura, prima ancora della conferma e del
+ * voto. Non c'e nessun modulo: basta una mail all'indirizzo della Sezione
+ * Territoriale, ed e qui che si dice cosa deve contenere.
+ */
+function richiestaCandidature() {
+  const ss = SpreadsheetApp.getActive(), c = cfg_();
+  if (!ss.getSheetByName(SH.SOC) || numSocieta_() === 0)
+    return ui_().alert('Nessuna societa in elenco: compila prima il foglio "Societa".');
+  const mail = emailPerNome_();
+  const righe = nomiSocieta_().map(nome => [nome, String(mail[nome] || '').trim(),
+    'Richiesta di candidatura', testoRichiesta_(c, nome), true]);
+  scriviConferme_(ss, righe, 'apertura');
+
+  const senza = righe.filter(r => !r[1]).map(r => r[0]);
+  const gia = candidati_().length;
+  ui_().alert('Richieste di candidatura pronte',
+    righe.length + ' messaggi nel foglio "' + SH.CONF + '", uno per societa.\n\n' +
+    'Chiedono di presentare un candidato — uno per societa — con nome, qualifica, squadra e anni, ' +
+    'per mail' + (indirizzoST_(c) ? ' a ' + indirizzoST_(c) : ' alla Sezione Territoriale') + '. ' +
+    'Le candidature che arrivano le scrivi tu nel foglio "' + SH.CAND + '", anche doppie o dubbie: ' +
+    'poi con "Chiedi conferma delle candidature" fai ricontrollare a ciascuno quello che la riguarda.' +
+    (gia ? '\n\nNel foglio "' + SH.CAND + '" ci sono gia ' + gia + ' nomi: se stai riaprendo la raccolta, ' +
+      'controlla che siano quelli giusti.' : '') +
+    (senza.length ? '\n\nSenza indirizzo email: ' + senza.join(', ') + '. Da contattare per un altro canale.' : ''),
+    ui_().ButtonSet.OK);
+  return righe.length;
+}
+
+/** Il testo della richiesta iniziale: cosa serve, entro quando, dove mandarlo. */
+function testoRichiesta_(c, nome) {
+  const titolo = String(c['Titolo'] || 'Elezione CTL Baskin');
+  const dove = intestazione_(c);
+  const scadenza = String(c[CFG_SCADENZA] || '').trim();
+  const a = indirizzoST_(c) ? ' a ' + indirizzoST_(c) : ' alla Sezione Territoriale';
+  const posti = posti_(c);
+  const r = [];
+  r.push(titolo + (dove ? ' — ' + dove : ''));
+  r.push('');
+  r.push('Ciao ' + nome + ', si apre la raccolta delle candidature per la Commissione Tecnica Locale.');
+  r.push('');
+  r.push('La Commissione sarà composta da ' + posti + ' commissari, eletti dalle società con un voto per società. ' +
+    'Ogni società può presentare UN SOLO candidato.');
+  r.push('');
+  r.push('Non c\'è nessun modulo da compilare: basta una mail' + a + ' con');
+  r.push('• nome e cognome del candidato;');
+  r.push('• la qualifica: Allenatore, Aiuto allenatore o Altro;');
+  r.push('• la squadra per cui è tesserato o in cui opera;');
+  r.push('• gli anni di tesseramento o di incarichi nel baskin (servono solo in caso di parità di voti).');
+  r.push('');
+  r.push('Nella Commissione può entrare al massimo un Aiuto allenatore: tenetelo presente nella scelta, ' +
+    'ma presentate chi ritenete più adatto — il limite lo gestiamo noi in fase di assegnazione dei posti.');
+  r.push('');
+  r.push('Mandatecela' + (scadenza ? ' entro ' + scadenza : ' il prima possibile') +
+    '. Se scegliete di non presentare nessuno va benissimo, ma fatecelo sapere comunque con due righe: ' +
+    'così sappiamo che la mail è arrivata e non stiamo aspettando una risposta che non arriverà.');
+  r.push('');
+  r.push('Poi vi riscriveremo con i nominativi che ci risultano per la vostra società, per una conferma ' +
+    'prima di aprire il voto. Al voto riceverete un link riservato, valido una volta sola.');
+  r.push('');
+  r.push('Grazie.');
+  return r.join('\n');
+}
+
+/**
+ * Chiede un candidato alle societa che non hanno un commissario in Commissione.
+ * Serve quando la graduatoria non basta piu: dimissioni a Commissione gia
+ * costituita, o troppe rinunce in fase di costituzione. Il posto vacante va
+ * riassegnato, e chiederlo a chi non e rappresentato e il modo piu equo di
+ * riempirlo.
+ */
+function richiestaCandidatureScoperte() {
+  const ss = SpreadsheetApp.getActive(), c = cfg_();
+  if (!ss.getSheetByName(SH.SOC) || numSocieta_() === 0)
+    return ui_().alert('Nessuna societa in elenco: compila prima il foglio "Societa".');
+  const com = commissari_();
+  if (!com.length) return ui_().alert('Nessun commissario in elenco',
+    'Questa richiesta serve a coprire un posto rimasto vacante in una Commissione già costituita.\n\n' +
+    'Se la Commissione non c\'è ancora, usa "1. Apri la raccolta delle candidature": va a tutte le società.',
+    ui_().ButtonSet.OK);
+  const s = societaScoperte_();
+  if (!s.scoperte.length) return ui_().alert('Tutte le società sono rappresentate',
+    'Ogni società in elenco ha già un commissario non rinunciatario.\n\n' +
+    'Se serve comunque un candidato, la richiesta va fatta a mano, oppure apri la raccolta a tutte le società.',
+    ui_().ButtonSet.OK);
+  const mail = emailPerNome_();
+  const righe = s.scoperte.map(nome => [nome, String(mail[nome] || '').trim(),
+    'Candidatura per un posto vacante', testoRichiestaScoperta_(c, nome, s.vacanti), true]);
+  scriviConferme_(ss, righe, 'scoperte');
+
+  const senza = righe.filter(r => !r[1]).map(r => r[0]);
+  ui_().alert('Richieste pronte per le società senza commissario',
+    righe.length + ' messaggi nel foglio "' + SH.CONF + '": ' + s.scoperte.join(', ') + '.\n\n' +
+    'Posti da coprire: ' + s.vacanti + ' su ' + posti_(c) + ' (in Commissione ci sono ' + s.dentro +
+    ' commissari non rinunciatari).\n\n' +
+    'Le candidature che arrivano le scrivi nel foglio "' + SH.CAND + '", poi si torna al voto: ' +
+    '"Azzera un round" sul round 1 e di nuovo "Apri il round 1". Se invece la CTN concede la deroga, ' +
+    'non serve votare: annota la deroga nel Verbale.' +
+    (s.fuori.length ? '\n\nCommissari non attribuibili a nessuna società in elenco (squadra non in "' + SH.SQ +
+      '"): ' + s.fuori.join(', ') + '. Controlla, oppure la loro società risulta scoperta per sbaglio.' : '') +
+    (senza.length ? '\n\nSenza indirizzo email: ' + senza.join(', ') + '. Da contattare per un altro canale.' : ''),
+    ui_().ButtonSet.OK);
+  return righe.length;
+}
+
+/**
+ * Chi non ha un commissario in Commissione. Un rinunciatario non copre la sua
+ * societa: il posto e vacante, e la societa non e rappresentata.
+ */
+function societaScoperte_() {
+  const sq = mappaSquadraSocieta_();
+  const coperte = {}, fuori = [];
+  let dentro = 0;
+  commissari_().forEach(x => {
+    if (x.rinuncia) return;
+    dentro++;
+    const s = sq[x.squadra] || '';
+    if (s) coperte[s] = true; else fuori.push(x.nome);
+  });
+  return { scoperte: nomiSocieta_().filter(n => !coperte[n]), dentro: dentro, fuori: fuori,
+    vacanti: Math.max(0, posti_(cfg_()) - dentro) };
+}
+
+/** Il testo per le societa scoperte: perche si richiede, e cosa serve. */
+function testoRichiestaScoperta_(c, nome, vacanti) {
+  const titolo = String(c['Titolo'] || 'Elezione CTL Baskin');
+  const dove = intestazione_(c);
+  const scadenza = String(c[CFG_SCADENZA] || '').trim();
+  const a = indirizzoST_(c) ? ' a ' + indirizzoST_(c) : ' alla Sezione Territoriale';
+  const r = [];
+  r.push(titolo + (dove ? ' — ' + dove : ''));
+  r.push('');
+  r.push('Ciao ' + nome + ', nella Commissione Tecnica Locale ' +
+    (vacanti === 1 ? 'è rimasto vacante un posto' : 'sono rimasti vacanti ' + vacanti + ' posti') +
+    ' e la graduatoria delle riserve non basta a coprirlo' + (vacanti === 1 ? '' : 'i') + '.');
+  r.push('');
+  r.push('La vostra società non ha un proprio commissario in Commissione, quindi vi chiediamo se volete ' +
+    'presentare un candidato.');
+  r.push('');
+  r.push('Come la prima volta, non c\'è nessun modulo: basta una mail' + a + ' con');
+  r.push('• nome e cognome del candidato;');
+  r.push('• la qualifica: Allenatore, Aiuto allenatore o Altro;');
+  r.push('• la squadra per cui è tesserato o in cui opera;');
+  r.push('• gli anni di tesseramento o di incarichi nel baskin.');
+  r.push('');
+  r.push('Una sola candidatura per società.');
+  r.push('');
+  r.push('Rispondete' + (scadenza ? ' entro ' + scadenza : ' il prima possibile') +
+    ' anche solo per dire che non presentate nessuno: serve a sapere se possiamo chiudere la raccolta. ' +
+    'Raccolte le candidature si torna al voto delle società, con le stesse regole di prima.');
+  r.push('');
+  r.push('Grazie.');
+  return r.join('\n');
+}
 
 /**
  * Prima di aprire la votazione si chiede a ogni societa di confermare le
@@ -987,23 +1171,16 @@ function preparaConferme() {
     (perSoc[s] = perSoc[s] || []).push(k);
   });
   const mail = emailPerNome_();
-  const sh = svuotaFoglio_(ss, SH.CONF, CONF_HEADER);
   const righe = nomiSocieta_().map(nome => {
     const lista = perSoc[nome] || [];
     return [nome, String(mail[nome] || '').trim(),
-      lista.map(k => k.nome).join(', ') || '(nessuna)', testoConferma_(c, nome, lista), true];
+      'Candidature: ' + (lista.map(k => k.nome).join(', ') || 'nessuna'),
+      testoConferma_(c, nome, lista), true];
   });
-  if (righe.length) {
-    sh.getRange(2, 1, righe.length, CONF_HEADER.length).setValues(righe);
-    sh.getRange(2, 4, righe.length, 1).setWrap(true).setVerticalAlignment('top');
-    sh.getRange(2, 5, righe.length, 1).setDataValidation(
-      SpreadsheetApp.newDataValidation().requireCheckbox().build()).setHorizontalAlignment('center');
-  }
-  [220, 230, 220, 600, 90].forEach((w, i) => sh.setColumnWidth(i + 1, w));
-  sh.activate();
+  scriviConferme_(ss, righe, 'candidature');
 
   const doppie = Object.keys(perSoc).filter(s => perSoc[s].length > 1);
-  const vuote = righe.filter(r => r[2] === '(nessuna)').map(r => r[0]);
+  const vuote = righe.filter(r => /: nessuna$/.test(r[2])).map(r => r[0]);
   const senza = righe.filter(r => !r[1]).map(r => r[0]);
   ui_().alert('Richieste di conferma pronte',
     righe.length + ' messaggi nel foglio "' + SH.CONF + '", uno per societa.\n\n' +
@@ -1064,11 +1241,81 @@ function testoConferma_(c, nome, lista) {
   return r.join('\n');
 }
 
-/** Manda le richieste di conferma alle righe spuntate del foglio "Conferme candidature". */
+/**
+ * Chiede ai commissari eletti se accettano l'incarico, prima di aprire il voto
+ * per il Presidente. Finche il Presidente non e eletto una rinuncia si risolve
+ * con lo scorrimento della graduatoria; dopo diventa un problema. Chi ha gia la
+ * casella "Rinuncia" spuntata non viene disturbato.
+ */
+function preparaConfermeCommissari() {
+  const ss = SpreadsheetApp.getActive(), c = cfg_();
+  const com = commissari_();
+  if (!com.length) return ui_().alert('Nessun commissario: usa prima "Round 2 → Prepara commissari e link".');
+  const gia = com.filter(x => x.rinuncia).map(x => x.nome);
+  const da = com.filter(x => !x.rinuncia);
+  if (!da.length) return ui_().alert('Tutti i commissari risultano gia rinunciatari: controlla il foglio "' + SH.COM + '".');
+  const voti = {};
+  try { datiRound1_(c).lista.forEach(x => voti[x.nome] = x.voti); } catch (e) { /* senza spoglio, nessun numero */ }
+  const mail = emailPerNome_();
+  const righe = da.map(x => [x.nome, String(mail[x.nome] || '').trim(), 'Accettazione incarico in CTL',
+    testoConfermaIncarico_(c, x, voti[x.nome]), true]);
+  scriviConferme_(ss, righe, 'commissari');
+
+  const senza = righe.filter(r => !r[1]).map(r => r[0]);
+  ui_().alert('Richieste di conferma pronte',
+    righe.length + ' messaggi nel foglio "' + SH.CONF + '", uno per commissario eletto.\n\n' +
+    'Chiedono di confermare l\'incarico prima di aprire il voto per il Presidente: finche il Presidente non e ' +
+    'eletto, una rinuncia si risolve con lo scorrimento della graduatoria e non serve rivotare.\n\n' +
+    'Chi rinuncia: spunta la sua casella "Rinuncia" nel foglio "' + SH.COM + '", poi rifai "Prepara commissari e link".' +
+    (gia.length ? '\n\nGia rinunciatari, non li disturbo: ' + gia.join(', ') + '.' : '') +
+    (senza.length ? '\n\nSenza indirizzo email: ' + senza.join(', ') + '. Da sentire per un altro canale.' : ''),
+    ui_().ButtonSet.OK);
+  return righe.length;
+}
+
+/** Il testo della richiesta ai commissari: cosa e successo, e cosa serve sapere. */
+/**
+ * Quante ore hanno i commissari per rispondere. Poche, e con data e ora
+ * precise: "entro venerdi" si rimanda, "entro le 18:30 di oggi" no. Il voto per
+ * il Presidente aspetta quella risposta, quindi la finestra e stretta apposta.
+ */
+function scadenzaIncarico_(c) {
+  const n = Number(String((c || cfg_())[CFG_ORE_INCARICO] || '').replace(',', '.'));
+  const ore = n > 0 ? n : 6;
+  return { ore: ore, quando: new Date(new Date().getTime() + ore * 3600000) };
+}
+
+function testoConfermaIncarico_(c, x, voti) {
+  const titolo = String(c['Titolo'] || 'Elezione CTL Baskin');
+  const dove = intestazione_(c);
+  const s = scadenzaIncarico_(c);
+  const r = [];
+  r.push(titolo + (dove ? ' — ' + dove : ''));
+  r.push('');
+  r.push('Ciao ' + x.nome + ', lo spoglio è concluso: risulti ELETTO nella Commissione Tecnica Locale' +
+    (voti ? ', con ' + voti + (voti === 1 ? ' preferenza' : ' preferenze') : '') + '.');
+  r.push('');
+  r.push('Prima di aprire il voto per il Presidente ti chiediamo di confermare che accetti l\'incarico.');
+  r.push('');
+  r.push('Se per qualsiasi motivo non puoi accettarlo, è il momento di dirlo: finché il Presidente non è eletto ' +
+    'il posto passa al primo dei non eletti seguendo la graduatoria, senza bisogno di tornare al voto. ' +
+    'Dopo diventa molto più complicato, e qualche volta si deve rivotare.');
+  r.push('');
+  r.push('Rispondi a questo messaggio con un sì o un no entro ' + s.ore +
+    (s.ore === 1 ? ' ora' : ' ore') + ', cioè entro il ' + dataTesto_(s.quando) +
+    '. Il voto per il Presidente aspetta queste risposte, quindi la finestra è stretta: ' +
+    'senza risposta consideriamo l\'incarico accettato.');
+  r.push('');
+  r.push('Subito dopo riceverai il link per votare il Presidente e, a seguire, il Vice.');
+  return r.join('\n');
+}
+
+/** Manda le richieste di conferma alle righe spuntate del foglio "Conferme". */
 function inviaConferme() {
   const ui = ui_(), c = cfg_();
   const sh = SpreadsheetApp.getActive().getSheetByName(SH.CONF);
-  if (!sh || sh.getLastRow() < 2) return ui.alert('Nessuna richiesta preparata: usa prima "Prepara le richieste di conferma".');
+  if (!sh || sh.getLastRow() < 2) return ui.alert('Nessuna richiesta preparata: usa prima una delle voci di ' +
+    '"Richieste e conferme" (raccolta, conferma delle candidature o accettazione dell\'incarico).');
   const righe = sh.getRange(2, 1, sh.getLastRow() - 1, CONF_HEADER.length).getValues()
     .filter(r => String(r[0]).trim() && r[4] === true);
   if (!righe.length) return ui.alert('Nessuna riga spuntata nella colonna "Da inviare".');
@@ -1088,11 +1335,18 @@ function inviaConferme() {
   try { quota = MailApp.getRemainingDailyQuota(); } catch (e) { quota = con.length; }
   if (quota < con.length) return ui.alert('Quota email insufficiente',
     'Da mandare: ' + con.length + '. Restano per oggi: ' + quota + '.', ui.ButtonSet.OK);
-  const oggetto = String(c['Titolo'] || 'Elezione CTL Baskin') + ' — conferma delle candidature';
-  if (ui.alert('Richiesta di conferma',
+  const quale = String(PropertiesService.getScriptProperties().getProperty(P_CONF) || 'candidature');
+  const code = {
+    apertura: ' — candidature aperte per la CTL',
+    scoperte: ' — serve un candidato per la CTL',
+    candidature: ' — conferma delle candidature',
+    commissari: ' — accetti l\'incarico in CTL?'
+  };
+  const oggetto = String(c['Titolo'] || 'Elezione CTL Baskin') + (code[quale] || code.candidature);
+  if (ui.alert(quale === 'apertura' || quale === 'scoperte' ? 'Richiesta di candidatura' : 'Richiesta di conferma',
     'Mando ' + con.length + ' email dal tuo account Google, con oggetto:\n' + oggetto +
     '\n\nA: ' + con.map(v => v.nome).join(', ') + restano +
-    '\n\nNon contengono link di voto: servono solo a far confermare le candidature. Procedere?',
+    '\n\nNon contengono link di voto: chiedono solo una risposta. Procedere?',
     ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
   const mittente = mittente_(c);
   let fatte = 0;

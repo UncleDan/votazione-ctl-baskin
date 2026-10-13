@@ -1,5 +1,16 @@
 # Changelog
 
+## v39
+- **La conferma dell'incarico si chiede entro poche ore, non entro giorni.** Il voto per il Presidente è fermo in attesa di quelle risposte, quindi una scadenza larga serve solo a farle arrivare tardi. Nuovo parametro *Config → Ore per confermare l'incarico* (di base 6); il messaggio riporta le ore **e** la data e ora precise — «entro 6 ore, cioè entro il 13/10/2026 19:30» — e spiega perché la finestra è stretta.
+- **Richiesta di candidatura alle società senza commissario**: *Richieste e conferme → Chiedi candidati alle società senza commissario*. Serve quando la graduatoria non basta più — dimissioni a commissione costituita, o troppe rinunce in fase di costituzione: dice quanti posti sono vacanti, che le riserve non bastano, e chiede una candidatura alle sole società non rappresentate. Chi ha rinunciato non copre la sua società, perché il suo posto è vacante. I commissari con una squadra non in elenco vengono segnalati, perché non sono attribuibili a nessuna società.
+- **Richiesta iniziale delle candidature**: *Richieste e conferme → 1. Apri la raccolta delle candidature*, il messaggio che apre tutto il giro. Dice quanti commissari si eleggono, che la candidatura è una per società, cosa deve contenere la mail — nome, qualifica, squadra, anni — e che in commissione entra al massimo un Aiuto allenatore. Chiede un cenno anche a chi non presenta nessuno: senza, si resta ad aspettare una mail che non arriverà.
+- Il sottomenu *Conferme* diventa **Richieste e conferme**, con i tre passi numerati nell'ordine in cui si usano. L'oggetto della mail cambia da solo secondo la richiesta preparata per ultima: raccolta, conferma, accettazione dell'incarico, posto vacante.
+
+## v38
+- **Richiesta di conferma ai commissari eletti**, da mandare prima di aprire il voto per il Presidente: *Conferme → Chiedi ai commissari se accettano l'incarico*. Il messaggio dice che risultano eletti e con quante preferenze, chiede un sì o un no e spiega perché conviene rispondere subito — finché il Presidente non è eletto il posto scorre lungo la graduatoria e non serve rivotare, dopo sì. Niente link di voto dentro.
+- Chi ha già la casella *Rinuncia* spuntata non viene disturbato, e viene elencato a parte.
+- Il foglio "Conferme candidature" diventa **"Conferme"** e ospita entrambe le richieste, con una colonna *Riguarda* che dice di quale si tratta; il sottomenu *Candidature* diventa *Conferme*. Il parametro *Scadenza conferma candidature* diventa *Scadenza per le conferme* e vale per tutte e due. Rinomine automatiche, contenuto intatto.
+
 ## v37
 - **L'annotazione del pari merito vale ovunque in graduatoria**, non solo sul confine fra l'ultimo eletto e il primo escluso: fra parentesi compare quello che ha deciso l'ordine — gli anni, il ballottaggio o il sorteggio — anche fra due riserve a pari preferenze, perché quello è l'ordine con cui subentrano.
 - Il confine fra ultimo eletto e primo escluso conserva una riga dedicata sotto la tabella, con i due valori a confronto: è la decisione che più facilmente verrà contestata.

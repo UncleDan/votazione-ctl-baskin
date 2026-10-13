@@ -1,4 +1,4 @@
-# Votazione CTL Baskin — istruzioni (v37)
+# Votazione CTL Baskin — istruzioni (v38)
 
 Voto online anonimo, utilizzabile da telefono senza account Google:
 
@@ -67,11 +67,17 @@ La CTL ha bisogno di **almeno un candidato per posto**: con 11 società i commis
 
 Se la Sezione Territoriale decide una commissione più piccola, scrivi il numero in *Config → Numero eletti*: quello ha la precedenza sulla regola, e con esso si abbassano sia i posti sia le preferenze per scheda.
 
+## Il primo passo: aprire la raccolta delle candidature
+
+**🗳️ Votazione → Richieste e conferme → 1. Apri la raccolta delle candidature** scrive nel foglio *Conferme* un messaggio per ogni società, da mandare quando ancora non c'è nessun nome in elenco. Dice quante poltrone ci sono — il numero calcolato dalla regola, o quello scritto in *Config → Numero eletti* — e che **ogni società presenta un solo candidato**; elenca cosa deve contenere la mail di candidatura (nome e cognome, qualifica, squadra, anni di tesseramento o di incarichi); ricorda che in commissione entra al massimo un Aiuto allenatore, lasciando però la scelta alla società; e chiede un cenno di risposta **anche a chi decide di non presentare nessuno**, altrimenti resti ad aspettare una mail che non arriverà.
+
+Non c'è nessun modulo: le candidature arrivano per mail all'indirizzo della Sezione e le trascrivi tu nel foglio *Candidati*, **tutte**, anche le doppie e quelle incomplete. A sistemarle serve il passo successivo.
+
 ## Prima di aprire: far confermare le candidature
 
 Il giro giusto è: **si raccoglie tutto** — comprese le candidature doppie, tardive o incomplete — **si fa confermare a ciascuna società quello che la riguarda**, si sistema l'elenco con le risposte in mano, e solo allora si apre il voto. Correggere prima costa una mail; correggere dopo non si può.
 
-**🗳️ Votazione → Candidature → Prepara le richieste di conferma** scrive nel foglio *Conferme candidature* un messaggio per società, con l'elenco dei suoi candidati — nome, qualifica, squadra, anni — e **le Note di ciascuno**. È lì che il meccanismo diventa utile: quello che scrivi nella colonna *Note* del foglio *Candidati* finisce nella mail, quindi è il posto dove annotare «arrivata dopo la scadenza», «qualifica non indicata nel modulo», «da verificare». Scrivi, rigenera, e il messaggio si aggiorna.
+**🗳️ Votazione → Richieste e conferme → 2. Chiedi conferma delle candidature** scrive nel foglio *Conferme* un messaggio per società, con l'elenco dei suoi candidati — nome, qualifica, squadra, anni — e **le Note di ciascuno**. È lì che il meccanismo diventa utile: quello che scrivi nella colonna *Note* del foglio *Candidati* finisce nella mail, quindi è il posto dove annotare «arrivata dopo la scadenza», «qualifica non indicata nel modulo», «da verificare». Scrivi, rigenera, e il messaggio si aggiorna.
 
 Tre cose che il messaggio fa da solo:
 
@@ -81,11 +87,33 @@ Tre cose che il messaggio fa da solo:
 
 Non esiste un modulo da compilare: **basta una mail alla Sezione Territoriale**, e il messaggio lo dice. A chi non ha candidature elenca anche cosa scrivere — nome e cognome, qualifica, squadra, anni — così la risposta arriva completa invece di aprire un giro di chiarimenti.
 
-Due parametri in *Config*: **Scadenza conferma candidature** (testo libero, per esempio «venerdì 7 novembre») e **Indirizzo per le candidature**. Quest'ultimo lasciato vuoto vale l'account che possiede il foglio — che è poi la casella della Sezione, la stessa da cui partono le mail — ma conviene scriverlo: se un giorno apri il foglio con un altro account, l'indirizzo nel messaggio cambierebbe senza che te ne accorga.
+Due parametri in *Config*: **Scadenza per le conferme** (testo libero, per esempio «venerdì 7 novembre», e vale sia per la raccolta sia per la conferma) e **Indirizzo per le candidature**. Quest'ultimo lasciato vuoto vale l'account che possiede il foglio — che è poi la casella della Sezione, la stessa da cui partono le mail — ma conviene scriverlo: se un giorno apri il foglio con un altro account, l'indirizzo nel messaggio cambierebbe senza che te ne accorga.
 
-**Candidature → Invia le richieste per email** manda alle righe spuntate nella colonna *Da inviare*, che alla preparazione sono tutte spuntate; dopo l'invio le spunte si tolgono, così per sollecitare qualcuno basta rispuntare la sua riga. Queste mail **non contengono link di voto**: servono solo a confermare.
+**Richieste e conferme → Invia le richieste per email** manda alle righe spuntate nella colonna *Da inviare*, che alla preparazione sono tutte spuntate; dopo l'invio le spunte si tolgono, così per sollecitare qualcuno basta rispuntare la sua riga. L'oggetto cambia da solo secondo la richiesta preparata per ultima — raccolta, conferma, accettazione dell'incarico, candidatura per un posto vacante — così chi riceve capisce dal titolo di che si tratta. Queste mail **non contengono link di voto**: chiedono solo una risposta.
+
+Il foglio *Conferme* ne ospita **una richiesta alla volta**: ogni voce lo riscrive da capo. È voluto — in giro ce n'è sempre una sola — ma vuol dire che se prepari la richiesta successiva prima di aver mandato la precedente, quella precedente la perdi.
 
 Poi aggiorni il foglio *Candidati* a mano con le risposte, e procedi con l'apertura.
+
+## Prima del Presidente: far confermare l'incarico
+
+Una rinuncia ha due prezzi diversi a seconda di quando arriva. **Finché il Presidente non è eletto**, il posto passa al primo dei non eletti seguendo la graduatoria e non serve rivotare. **Dopo**, la commissione che ha espresso il Presidente non è più quella, e qualche volta si deve tornare al voto.
+
+Per questo, fra *Prepara commissari e link* e l'apertura del round 2, c'è **🗳️ Votazione → Richieste e conferme → 3. Chiedi ai commissari se accettano l'incarico**. Scrive nel foglio *Conferme* un messaggio per ogni eletto: gli dice che risulta eletto e con quante preferenze, gli chiede un sì o un no, e gli spiega perché conviene dirlo adesso. Non contiene link di voto.
+
+La risposta si chiede **entro poche ore**, non entro la settimana: il voto per il Presidente è fermo in attesa, e una scadenza larga vuol dire solo che qualcuno risponderà l'ultimo giorno. Quante ore lo decidi in *Config → Ore per confermare l'incarico* (di base 6); il messaggio riporta le ore **e** la data e ora precise — «entro 6 ore, cioè entro il 13/10/2026 19:30» — perché «entro venerdì» si rimanda e un'ora esatta no. Senza risposta l'incarico si considera accettato, e il messaggio lo dice.
+
+Chi ha già la casella **Rinuncia** spuntata nel foglio *Commissari* non viene disturbato, e il programma te lo ricorda. Quando qualcuno rinuncia: spunti la sua casella e rilanci *Prepara commissari e link*, che rifà l'elenco con il subentrante.
+
+## Quando un posto resta vacante
+
+Le dimissioni di un commissario si risolvono con lo **scorrimento della graduatoria**: subentra il primo dei non eletti, con i limiti spiegati più sotto. Ma la graduatoria finisce, e qualche volta finisce subito — se in fase di costituzione le rinunce sono molte, o se le riserve che restano sono tutte aiuto allenatore oltre il limite.
+
+Quando non basta più, **🗳️ Votazione → Richieste e conferme → Chiedi candidati alle società senza commissario** scrive un messaggio alle sole società che **non hanno un proprio commissario in commissione** — chi ha rinunciato non copre la sua società, perché il suo posto è vacante. Il messaggio dice quanti posti sono vacanti, che le riserve non bastano, e chiede una candidatura con le stesse regole di prima: una per società, nome, qualifica, squadra, anni.
+
+Chiederlo a chi non è rappresentato è il modo più equo di riempire il posto. Poi le candidature nuove vanno nel foglio *Candidati* e si torna al voto delle società: *Azzera un round* sul round 1 e di nuovo *Apri il round 1*. Se invece la Commissione Tecnica Nazionale concede la deroga, non serve votare: la deroga si annota nel Verbale.
+
+Il programma segnala anche i commissari la cui squadra non è nel foglio *Squadre*: non sono attribuibili a nessuna società, quindi la loro società risulterebbe scoperta per sbaglio. Si sistema aggiungendo la squadra.
 
 ## Rinuncia di un candidato
 
@@ -243,7 +271,7 @@ Nel dialogo di stampa scegli **Foglio corrente**, formato **A4**, orientamento *
 
 ## L'ordine dei fogli
 
-*Inizializza / aggiorna fogli* rimette le schede in quest'ordine: prima i dati da compilare (*Config*, *Società*, *Squadre*, *Conferme candidature*, *Candidati*), poi i documenti da leggere (*Verbale*, *Riepilogo urna*), poi quello che serve durante la votazione (*Ballottaggio*, *Commissari*), infine i risultati (*Risultati*, *Risultati Presidente*, *Risultati Vice*, *Risultati ballottaggi*) e i *Messaggi*.
+*Inizializza / aggiorna fogli* rimette le schede in quest'ordine: prima i dati da compilare (*Config*, *Società*, *Squadre*, *Conferme*, *Candidati*), poi i documenti da leggere (*Verbale*, *Riepilogo urna*), poi quello che serve durante la votazione (*Ballottaggio*, *Commissari*), infine i risultati (*Risultati*, *Risultati Presidente*, *Risultati Vice*, *Risultati ballottaggi*) e i *Messaggi*.
 
 I fogli non ancora creati si saltano, e un foglio aggiunto da te resta in coda dov'è: il programma non lo sposta e non lo tocca.
 
