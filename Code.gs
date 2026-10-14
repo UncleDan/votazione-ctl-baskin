@@ -1,6 +1,6 @@
 /**
  * Votazione CTL Baskin — voto online anonimo, un voto per società
- * v39 — Google Apps Script legato a un Foglio Google
+ * v42 — Google Apps Script legato a un Foglio Google
  *
  * Codice sorgente: https://github.com/UncleDan/votazione-ctl-baskin
  * Copyright (c) 2026 Daniele Lolli (UncleDan) — Licenza MIT (vedi LICENSE)
@@ -29,13 +29,13 @@
  */
 
 const SH = {
-  CONFIG: 'Config', SOC: 'Società', SQ: 'Squadre', CAND: 'Candidati', RIS: 'Risultati',
+  CONFIG: 'Config', CHK: 'Checklist', SOC: 'Società', SQ: 'Squadre', CAND: 'Candidati', RIS: 'Risultati',
   COM: 'Commissari', BAL: 'Ballottaggio', RB: 'Risultati ballottaggi',
   RP: 'Risultati Presidente', RV: 'Risultati Vice', REP: 'Verbale', URNA: 'Riepilogo urna',
   MSG: 'Messaggi', CONF: 'Conferme'
 };
 const REPO_URL = 'https://github.com/UncleDan/votazione-ctl-baskin';
-const VERSIONE = 'v39';
+const VERSIONE = 'v42';
 const LOGO_SVG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.svg';
 const LOGO_PNG = 'https://eisi.it/wp-content/uploads/2026/09/logo-eisi-epp-cip.png';
 const PROPRIETA_LOGO = 'Logo © Ente Italiano Sport Inclusivi (EISI), tutti i diritti riservati';
@@ -52,11 +52,20 @@ const ROUND = {
 const SOC_HEADER = ['Società', 'Codice', 'Link diretto di voto', 'Ha votato', 'Nome breve', 'Email', 'Codice affiliazione'];
 const SQ_HEADER = ['Squadra', 'Società'];
 const CAND_HEADER = ['Candidato', 'Qualifica', 'Squadra', 'Anni tesseramento/incarichi (spareggio)', 'Note', 'Email', 'Rinuncia'];
-const COM_HEADER = ['Commissario', 'Qualifica', 'Squadra', 'Codice', 'Link diretto di voto', 'Votato Presidente', 'Votato Vice', 'Email', 'Rinuncia'];
+/*
+ * L'ultima colonna dei commissari si chiama "Rinuncia alla carica" e non
+ * "Rinuncia": qui si rinuncia a fare il Presidente o il Vice, restando
+ * commissari. Chi rinuncia all'incarico in Commissione si spunta nel foglio
+ * "Candidati", perche e li che il posto scorre al primo dei non eletti - e
+ * perche questo foglio si riscrive da capo a ogni "Prepara commissari".
+ */
+const COM_HEADER = ['Commissario', 'Qualifica', 'Squadra', 'Codice', 'Link diretto di voto', 'Votato Presidente', 'Votato Vice', 'Email', 'Rinuncia alla carica'];
 const BAL_HEADER = ['Votante', 'Codice ballottaggio', 'Link diretto di voto', 'Ha votato'];
 const RIS_HEADER = ['Posizione', 'Candidato', 'Qualifica', 'Squadra', 'Preferenze', 'Anni (spareggio)', 'Esito', 'Note'];
 const MSG_HEADER = ['Destinatario', 'Codice', 'Email', 'Messaggio da copiare e incollare', 'Rimanda'];
 const CONF_HEADER = ['Destinatario', 'Email', 'Riguarda', 'Messaggio da copiare e incollare', 'Da inviare'];
+const CHK_HEADER = ['Fatto', 'Cosa fare', 'Note'];
+const A4_CHECKLIST = [50, 520, 160];
 const LETTERE = 'ABCDEFGH';      // codici: 4 lettere A–H
 const CIFRE = '0123456789';      // + 4 cifre, nel formato XXXX-9999
 const FUSO = 'Europe/Rome';
@@ -128,6 +137,7 @@ function onOpen() {
       .addItem('Usa la pagina web (HTML)…', 'usaInterfacciaHtml')
       .addItem('Mostra interfaccia attiva e indirizzi', 'mostraInterfaccia'))
     .addSeparator()
+    .addItem('Checklist della procedura', 'mostraChecklist')
     .addItem('Aggiorna partecipazione', 'aggiornaPartecipazione')
     .addItem('Aggiorna verbale', 'aggiornaReport')
     .addItem('Aggiorna riepilogo urna', 'aggiornaUrna')
@@ -282,7 +292,8 @@ function setup() {
     '2) "Squadre": squadra e società di appartenenza.\n' +
     '3) "Candidati": nome, qualifica, squadra, anni.\n' +
     '4) Round 1 → "Genera codici e link mancanti".\n\n' +
-    'Verbale, Riepilogo urna e Messaggi sono stati rigenerati con questa versione (' + VERSIONE + ').' +
+    'Verbale, Riepilogo urna, Checklist e Messaggi sono stati rigenerati con questa versione (' + VERSIONE + ').\n' +
+    'Nel foglio "' + SH.CHK + '", subito dopo "' + SH.CONFIG + '", c\'e la procedura passo per passo da spuntare.' +
     (avvisi.length ? '\n\n' + avvisi.join('\n\n') : ''));
 }
 
@@ -364,6 +375,11 @@ function migraNomiFogli_(ss) {
     const sh = ss.getSheetByName(v);
     if (sh && !ss.getSheetByName(vecchi[v])) sh.setName(vecchi[v]);
   });
+  // "Rinuncia" -> "Rinuncia alla carica": il valore resta, cambia solo il nome
+  const com = ss.getSheetByName(SH.COM), n = COM_HEADER.length;
+  if (com && com.getLastColumn() >= n &&
+      String(com.getRange(1, n).getValue()).trim().toLowerCase() === 'rinuncia')
+    com.getRange(1, n).setValue(COM_HEADER[n - 1]);
 }
 
 /**
@@ -372,7 +388,7 @@ function migraNomiFogli_(ss) {
  * risultati e i messaggi. I fogli non ancora creati si saltano, e quelli che
  * non sono in elenco (aggiunti a mano) restano in coda dove sono.
  */
-const ORDINE_FOGLI = [SH.CONFIG, SH.SOC, SH.SQ, SH.CONF, SH.CAND, SH.REP, SH.URNA,
+const ORDINE_FOGLI = [SH.CONFIG, SH.CHK, SH.SOC, SH.SQ, SH.CONF, SH.CAND, SH.REP, SH.URNA,
   SH.BAL, SH.COM, SH.RIS, SH.RP, SH.RV, SH.RB, SH.MSG];
 
 function ordinaFogli_() {
@@ -624,7 +640,11 @@ function preparaMessaggiRound_(r) {
     'Il link dentro il messaggio e gia quello personale.\n\n' +
     'Il messaggio c\'e per tutti, anche per chi non ha un indirizzo email: quelli si mandano per chat o per telefono.' +
     (senza.length ? '\n\nSenza indirizzo email (' + senza.length + '): ' + senza.join(', ') : '') +
-    '\n\nPer rimandare una mail a qualcuno, spunta la casella "Rimanda" sulla sua riga e usa ' +
+    '\n\nNESSUNA MAIL È STATA INVIATA: qui si preparano soltanto. Per mandarle usa "Messaggi ai votanti → ' +
+    'Invia per email a chi ha l\'indirizzo", che prima ti mostra oggetto e destinatari e chiede conferma: ' +
+    'finché non rispondi di sì non parte niente.\n\n' +
+    'All\'apertura del round, invece, l\'avviso con il link parte da solo a chi ha un indirizzo.\n\n' +
+    'Per rimandare una mail a qualcuno, spunta la casella "Rimanda" sulla sua riga e usa ' +
     '"Messaggi ai votanti → Rimanda le email spuntate".');
 }
 
@@ -976,6 +996,22 @@ function testoMessaggio_(c, x, nome, codice) {
 /* ================= Richieste e conferme ================= */
 
 /**
+ * La coda di ogni avviso di preparazione. Preparare non e inviare, ma il foglio
+ * si riempie di messaggi gia spuntati e sembra che siano partiti: meglio dirlo
+ * a chiare lettere, invece di lasciarlo capire.
+ */
+function nienteInviato_(colonna, voce) {
+  return '\n\nNESSUNA MAIL È STATA INVIATA: qui si preparano soltanto. Rileggi i testi e togli la spunta "' +
+    colonna + '" a chi non vuoi scrivere, poi usa "' + voce + '". Prima di partire ti mostra oggetto e ' +
+    'destinatari e chiede conferma: finché non rispondi di sì non parte niente.';
+}
+
+/** La coda per le richieste del foglio "Conferme": stessa colonna, stessa voce. */
+function nienteInviatoConf_() {
+  return nienteInviato_('Da inviare', 'Richieste e conferme → Invia le richieste per email');
+}
+
+/**
  * Scrive le richieste nel foglio "Conferme" e ricorda di che richiesta si
  * tratta: l'oggetto della mail dipende da questo, e il foglio e sempre lo
  * stesso perche di richieste in giro ce n'e una alla volta.
@@ -1019,7 +1055,8 @@ function richiestaCandidature() {
     'poi con "Chiedi conferma delle candidature" fai ricontrollare a ciascuno quello che la riguarda.' +
     (gia ? '\n\nNel foglio "' + SH.CAND + '" ci sono gia ' + gia + ' nomi: se stai riaprendo la raccolta, ' +
       'controlla che siano quelli giusti.' : '') +
-    (senza.length ? '\n\nSenza indirizzo email: ' + senza.join(', ') + '. Da contattare per un altro canale.' : ''),
+    (senza.length ? '\n\nSenza indirizzo email: ' + senza.join(', ') + '. Da contattare per un altro canale.' : '') +
+    nienteInviatoConf_(),
     ui_().ButtonSet.OK);
   return righe.length;
 }
@@ -1095,7 +1132,8 @@ function richiestaCandidatureScoperte() {
     'non serve votare: annota la deroga nel Verbale.' +
     (s.fuori.length ? '\n\nCommissari non attribuibili a nessuna società in elenco (squadra non in "' + SH.SQ +
       '"): ' + s.fuori.join(', ') + '. Controlla, oppure la loro società risulta scoperta per sbaglio.' : '') +
-    (senza.length ? '\n\nSenza indirizzo email: ' + senza.join(', ') + '. Da contattare per un altro canale.' : ''),
+    (senza.length ? '\n\nSenza indirizzo email: ' + senza.join(', ') + '. Da contattare per un altro canale.' : '') +
+    nienteInviatoConf_(),
     ui_().ButtonSet.OK);
   return righe.length;
 }
@@ -1191,7 +1229,8 @@ function preparaConferme() {
       'accorgersi di un modulo perso.' : '') +
     (fuori.length ? '\n\nFuori da ogni societa (autocandidature o squadra non in elenco): ' +
       fuori.map(k => k.nome).join(', ') + '. Questi li confermi tu, direttamente con loro.' : '') +
-    (senza.length ? '\n\nSenza indirizzo email: ' + senza.join(', ') + '. Da contattare per un altro canale.' : ''),
+    (senza.length ? '\n\nSenza indirizzo email: ' + senza.join(', ') + '. Da contattare per un altro canale.' : '') +
+    nienteInviatoConf_(),
     ui_().ButtonSet.OK);
   return righe.length;
 }
@@ -1244,16 +1283,17 @@ function testoConferma_(c, nome, lista) {
 /**
  * Chiede ai commissari eletti se accettano l'incarico, prima di aprire il voto
  * per il Presidente. Finche il Presidente non e eletto una rinuncia si risolve
- * con lo scorrimento della graduatoria; dopo diventa un problema. Chi ha gia la
- * casella "Rinuncia" spuntata non viene disturbato.
+ * con lo scorrimento della graduatoria; dopo diventa un problema.
+ * La richiesta va a tutti quelli che sono nel foglio: chi ha gia rinunciato
+ * all'incarico non c'e piu, perche il suo posto e scorso. La spunta "Rinuncia
+ * alla carica" riguarda solo Presidenza e Vice, quindi non esclude nessuno:
+ * viene solo segnalata.
  */
 function preparaConfermeCommissari() {
   const ss = SpreadsheetApp.getActive(), c = cfg_();
-  const com = commissari_();
-  if (!com.length) return ui_().alert('Nessun commissario: usa prima "Round 2 → Prepara commissari e link".');
-  const gia = com.filter(x => x.rinuncia).map(x => x.nome);
-  const da = com.filter(x => !x.rinuncia);
-  if (!da.length) return ui_().alert('Tutti i commissari risultano gia rinunciatari: controlla il foglio "' + SH.COM + '".');
+  const da = commissari_();
+  if (!da.length) return ui_().alert('Nessun commissario: usa prima "Round 2 → Prepara commissari e link".');
+  const gia = da.filter(x => x.rinuncia).map(x => x.nome);
   const voti = {};
   try { datiRound1_(c).lista.forEach(x => voti[x.nome] = x.voti); } catch (e) { /* senza spoglio, nessun numero */ }
   const mail = emailPerNome_();
@@ -1266,9 +1306,13 @@ function preparaConfermeCommissari() {
     righe.length + ' messaggi nel foglio "' + SH.CONF + '", uno per commissario eletto.\n\n' +
     'Chiedono di confermare l\'incarico prima di aprire il voto per il Presidente: finche il Presidente non e ' +
     'eletto, una rinuncia si risolve con lo scorrimento della graduatoria e non serve rivotare.\n\n' +
-    'Chi rinuncia: spunta la sua casella "Rinuncia" nel foglio "' + SH.COM + '", poi rifai "Prepara commissari e link".' +
-    (gia.length ? '\n\nGia rinunciatari, non li disturbo: ' + gia.join(', ') + '.' : '') +
-    (senza.length ? '\n\nSenza indirizzo email: ' + senza.join(', ') + '. Da sentire per un altro canale.' : ''),
+    'Chi rinuncia all\'incarico: spunta la sua casella "Rinuncia" nel foglio "' + SH.CAND + '" — non in "' + SH.COM +
+    '", che si riscrive da capo — poi "Round 1 → Calcola risultati" e infine "Prepara commissari e link". ' +
+    'Il posto scorre al primo dei non eletti.' +
+    (gia.length ? '\n\nSegnati come "' + COM_HEADER[COM_HEADER.length - 1] + '": ' + gia.join(', ') +
+      '. Ricevono comunque la richiesta: quella spunta riguarda Presidenza e Vice, non il posto in Commissione.' : '') +
+    (senza.length ? '\n\nSenza indirizzo email: ' + senza.join(', ') + '. Da sentire per un altro canale.' : '') +
+    nienteInviatoConf_(),
     ui_().ButtonSet.OK);
   return righe.length;
 }
@@ -1615,25 +1659,47 @@ function preparaCommissari() {
   const eletti = v.filter(r => /^ELETT/i.test(String(r[iE])) && String(r[iN]).trim());
   if (!eletti.length) { ui.alert('Nessun eletto in "Risultati".'); return false; }
 
+  // Una rinuncia spuntata nel foglio "Candidati" vale solo dopo un nuovo
+  // spoglio: finche "Risultati" dice ELETTO, il posto non e ancora scorso.
+  const rin = {};
+  candidati_().forEach(x => { if (x.rinuncia) rin[x.nome] = true; });
+  const daRicalcolare = eletti.map(r => String(r[iN]).trim()).filter(n => rin[n]);
+  if (daRicalcolare.length) {
+    ui.alert('Prima ricalcola i risultati',
+      'Nel foglio "' + SH.CAND + '" risulta la rinuncia di: ' + daRicalcolare.join(', ') +
+      '.\n\nIn "' + SH.RIS + '" però compare ancora ELETTO, quindi il posto non è ancora scorso al primo dei ' +
+      'non eletti.\n\nLancia "Round 1 → Calcola risultati" e poi ripeti questa voce.', ui.ButtonSet.OK);
+    return false;
+  }
+
   const sh = sheet_(SH.COM);
-  const vecchi = {}, vecchieMail = emailCommissari_(), mailCand = {};
+  const vecchi = {}, vecchieCarica = {}, vecchieMail = emailCommissari_(), mailCand = {};
   candidati_().forEach(x => { if (x.email) mailCand[x.nome] = x.email; });
-  commissari_().forEach(x => { if (x.codice) vecchi[x.nome] = x.codice; });
+  commissari_().forEach(x => {
+    if (x.codice) vecchi[x.nome] = x.codice;
+    if (x.rinuncia) vecchieCarica[x.nome] = true;   // rinuncia alla carica: non si perde
+  });
   const usati = codiciEsistenti_();
   const rows = eletti.map(r => {
     const nome = String(r[iN]).trim();
     const cod = vecchi[nome] || codiceNuovo_(usati);
     return [nome, String(r[iQ]).trim(), String(r[iS]).trim(), cod, link_(cod), '', '',
-      vecchieMail[nome] || mailCand[nome] || '', ''];
+      vecchieMail[nome] || mailCand[nome] || '', vecchieCarica[nome] === true];
   });
   if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, COM_HEADER.length).clearContent();
   sh.getRange(2, 1, rows.length, COM_HEADER.length).setValues(rows);
   sh.autoResizeColumns(1, COM_HEADER.length);
   sh.activate();
   aggiornaReport();
+  const carica = rows.filter(r => r[COM_HEADER.length - 1] === true).map(r => r[0]);
   ui.alert(rows.length + ' commissari pronti.' + (link_('X')
     ? '\nInvia a ciascuno il SUO link: vale sia per il Presidente sia per il Vice.'
-    : '\nLink non disponibili: pubblica prima l\'app web.'));
+    : '\nLink non disponibili: pubblica prima l\'app web.') +
+    (carica.length ? '\n\nRestano segnati come "' + COM_HEADER[COM_HEADER.length - 1] + '": ' + carica.join(', ') +
+      '. Sono commissari a tutti gli effetti, ma non accettano Presidenza o Vice.' : '') +
+    '\n\nQuesto foglio si riscrive da capo a ogni "Prepara commissari e link": l\'unica cosa scritta a mano che ' +
+    'conserva sono gli indirizzi email e le spunte "' + COM_HEADER[COM_HEADER.length - 1] + '". ' +
+    'Chi rinuncia all\'incarico in Commissione si spunta nel foglio "' + SH.CAND + '".');
   return true;
 }
 
@@ -2488,6 +2554,130 @@ function triggerChiudeBallottaggio() {
 
 /* ================= Verbale ================= */
 
+/* ================= Checklist operativa ================= */
+
+/**
+ * La procedura dall'inizio alla fine, dentro al file: il documento a parte si
+ * va a cercare proprio il giorno in cui servirebbe averlo gia sotto gli occhi.
+ * Le voci citate sono quelle del menu, nell'ordine in cui si usano.
+ */
+function vociChecklist_() {
+  const S = t => ({ s: t });        // intestazione di sezione
+  const V = t => ({ t: t });        // riga da spuntare
+  return [
+    S('0. Prima di cominciare'),
+    V('Versione allineata: "Interfaccia di voto → Mostra interfaccia attiva e indirizzi" dice la versione del codice salvato, e in fondo alla pagina di voto compare quella servita. Se non coincidono: Distribuisci → Gestisci distribuzioni → matita → Nuova versione. Salvare l\'editor non basta.'),
+    V('"Inizializza / aggiorna fogli": aggiunge colonne e parametri nuovi, rimette i fogli in ordine, rigenera Verbale, Riepilogo urna e Messaggi. Leggi gli avvisi finali.'),
+    V('Una sola interfaccia attiva: o la pagina web, o la app Google. Chi arriva dall\'altra trova un cartello con l\'indirizzo giusto.'),
+    V('Config compilato: Titolo senza "(PROVA)", Sezione Territoriale, Anno sportivo, Numero eletti (vuoto = metà delle società, da 3 a 6), Max preferenze, Max aiuti allenatore, Email avvisi, Mittente email, Indirizzo per le candidature, Scadenza per le conferme, Ore per confermare l\'incarico, Solleciti prima della chiusura.'),
+
+    S('1. Candidature: raccolta e conferma'),
+    V('"Richieste e conferme → 1. Apri la raccolta delle candidature", poi "Invia le richieste per email". Nessun modulo: si risponde per mail all\'indirizzo della Sezione.'),
+    V('Trascrivi nel foglio "Candidati" TUTTO quello che arriva, doppioni e righe incomplete comprese. Nelle Note scrivi perché una riga è dubbia: le Note finiscono nella mail di conferma.'),
+    V('"Richieste e conferme → 2. Chiedi conferma delle candidature", poi invia. Rileggi i testi prima di mandare.'),
+    V('Aggiorna il foglio "Candidati" a mano con le risposte.'),
+    V('Vincoli: una società un solo candidato; candidati almeno quanti i posti; nomi distinguibili. Li ricontrolla "Inizializza / aggiorna fogli", e il round 1 non si apre se qualcosa non torna.'),
+    V('Email dei candidati compilate: quando uno risulta eletto, "Prepara commissari e link" se le porta dietro.'),
+
+    S('2. Round 1 — Commissari'),
+    V('"Round 1 → Genera codici e link mancanti".'),
+    V('Colonna Email del foglio "Società" completa. Più referenti nella stessa cella, separati da virgola.'),
+    V('"Messaggi ai votanti → Prepara i messaggi del round attivo", e rileggi una riga: link, codice, numero di preferenze.'),
+    V('Apertura: "Round 1 → Apri", oppure date in Config + "Votazioni programmate → Programma apertura e chiusura" (le date da sole non bastano). Verifica con "Mostra pianificazione".'),
+    V('All\'apertura l\'avviso email parte da solo a chi ha un indirizzo: non aprire "per provare" dopo aver messo gli indirizzi veri.'),
+    V('Avvisa a mano chi non ha email, e prova tu la pagina con un codice vero.'),
+    V('Durante il voto: "Aggiorna partecipazione" per sapere chi manca; casella "Rimanda" + "Rimanda le email spuntate" per chi dice di non aver ricevuto niente.'),
+    V('"Round 1 → Chiudi", poi "Round 1 → Calcola risultati".'),
+    V('Nessun "PARITÀ" nella colonna Esito di "Risultati". Se c\'è, vai al punto 3.'),
+
+    S('3. Ballottaggio — solo in caso di parità'),
+    V('"Ballottaggio → Prepara ballottaggio e nuovi link": i codici vecchi non valgono più.'),
+    V('Prepara i messaggi e mandali: è il passaggio che si dimentica.'),
+    V('"Ballottaggio → Apri", "Chiudi", "Calcola ballottaggio". Fino a tre giri.'),
+    V('Dopo tre giri senza esito: "Ballottaggio → Sorteggia la parità residua". L\'esito resta registrato con data e ora.'),
+
+    S('4. Round 2 — Presidente'),
+    V('"Round 2 → Prepara commissari e link". Il foglio "Commissari" si riscrive da capo: conserva solo email e spunte "Rinuncia alla carica".'),
+    V('Completa gli indirizzi mancanti nel foglio "Commissari".'),
+    V('"Richieste e conferme → 3. Chiedi ai commissari se accettano l\'incarico", e manda. La risposta si chiede entro poche ore: il voto per il Presidente aspetta.'),
+    V('Chi risponde di no: spunta "Rinuncia" nel foglio "Candidati" (NON in "Commissari"), poi "Round 1 → Calcola risultati", poi di nuovo "Prepara commissari e link".'),
+    V('"Messaggi ai votanti → Prepara i messaggi per il Presidente", e mandali.'),
+    V('"Round 2 → Apri", poi "Chiudi", poi "Calcola risultati".'),
+
+    S('5. Round 3 — Vice'),
+    V('"Config → Presidente" valorizzato: il round 3 parte da lì ed esclude il Presidente dalla lista.'),
+    V('"Messaggi ai votanti → Prepara i messaggi per il Vice", e mandali. Stesso codice del round 2: non si rigenera niente.'),
+    V('"Round 3 → Apri", poi "Chiudi", poi "Calcola risultati".'),
+
+    S('6. Chiusura dei lavori'),
+    V('"Aggiorna verbale" e "Aggiorna riepilogo urna".'),
+    V('Nel Riepilogo urna, per ogni round: "Controllo OK: schede = codici usati". Se leggi ANOMALIA, fermati.'),
+    V('Rileggi nel Verbale la graduatoria finale: eletti, riserve nell\'ordine di subentro, rinunce in coda. Serve il giorno delle dimissioni.'),
+    V('Stampa per il verbale: Verbale, Riepilogo urna, Risultati, Risultati Presidente, Risultati Vice e, se ci sono stati, Risultati ballottaggi. Foglio corrente · A4 · Verticale · 100%.'),
+    V('Comunica l\'esito alle società, ricordando che nel Riepilogo urna ciascuna ritrova la propria ricevuta. Manda il PDF, non il foglio Google: contiene codici e indirizzi.'),
+
+    S('7. Dopo: dimissioni e posti vacanti'),
+    V('Dimissioni: subentra il primo dei non eletti seguendo la graduatoria del Verbale (prima allenatori e "Altro", gli aiuti solo entro il limite).'),
+    V('Se la graduatoria non basta: deroga della CTN da annotare nel Verbale, oppure "Richieste e conferme → Chiedi candidati alle società senza commissario" e si torna al voto.')
+  ];
+}
+
+/**
+ * Scrive la checklist nel foglio, conservando spunte e note gia messe: sono
+ * l'unica cosa tua che c'e dentro, e perderle rigenerando sarebbe come
+ * cancellare gli appunti a meta lavoro. L'abbinamento e sul testo della riga.
+ */
+function aggiornaChecklist() {
+  const ss = SpreadsheetApp.getActive(), c = cfg_();
+  const sh = ss.getSheetByName(SH.CHK) || ss.insertSheet(SH.CHK);
+  const vecchie = {};
+  if (sh.getLastRow() > 1 && sh.getLastColumn() >= 3)
+    sh.getRange(1, 1, sh.getLastRow(), 3).getValues().forEach(r => {
+      const k = String(r[1]).trim();
+      if (k) vecchie[k] = { fatto: r[0] === true, note: String(r[2] == null ? '' : r[2]) };
+    });
+  sh.clear();
+  try { sh.getRange(1, 1, sh.getMaxRows(), 3).setDataValidation(null); } catch (e) {}
+
+  const voci = vociChecklist_();
+  const rows = [[String(c['Titolo'] || 'Elezione CTL') + (intestazione_(c) ? ' — ' + intestazione_(c) : '') +
+    ' — Checklist operativa', '', ''], ['', '', ''], CHK_HEADER.slice()];
+  const sezioni = [], spunte = [];
+  voci.forEach(v => {
+    if (v.s) { sezioni.push(rows.length + 1); rows.push(['', v.s, '']); return; }
+    const o = vecchie[v.t] || { fatto: false, note: '' };
+    spunte.push(rows.length + 1);
+    rows.push([o.fatto === true, v.t, o.note]);
+  });
+  const nFine = rows.length + 2;
+  rows.push(['', '', ''], ['', '', '']);
+  altezzeRighe_(sh);
+  sh.getRange(1, 1, rows.length, 3).setValues(rows);
+  sh.getRange(1, 1).setFontWeight('bold').setFontSize(14);
+  sh.getRange(3, 1, 1, 3).setFontWeight('bold').setBackground(BLU);
+  sh.setFrozenRows(3);
+  sezioni.forEach(r => sh.getRange(r, 1, 1, 3).setFontWeight('bold').setBackground(BLU));
+  spunte.forEach(r => sh.getRange(r, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireCheckbox().build()).setHorizontalAlignment('center'));
+  scriviPiede_(sh, nFine, c);
+  formatoA4_(sh, nFine + 2, A4_CHECKLIST);
+  return spunte.length;
+}
+
+/** Voce di menu: scrive la checklist e ci porta sopra. */
+function mostraChecklist() {
+  const n = aggiornaChecklist();
+  ordinaFogli_();
+  const sh = SpreadsheetApp.getActive().getSheetByName(SH.CHK);
+  if (sh) sh.activate();
+  ui_().alert('Checklist aggiornata',
+    n + ' passi nel foglio "' + SH.CHK + '", subito dopo "' + SH.CONFIG + '".\n\n' +
+    'Spunta la colonna "Fatto" man mano e usa "Note" per quello che vuoi ricordarti ' +
+    '(date, chi manca, decisioni prese).\n\n' +
+    'Rigenerandola, spunte e note restano: vengono riconosciute dal testo del passo. ' +
+    'Per ripartire da zero in una nuova elezione c\'è "Azzeramenti → Tutto".', ui_().ButtonSet.OK);
+}
+
 function aggiornaReport() {
   const ss = SpreadsheetApp.getActive();
   const c = cfg_();
@@ -2861,6 +3051,8 @@ function azzeraElezione_(svuotaAnagrafiche) {
     svuotaFoglio_(ss, SH.SQ, SQ_HEADER);
     svuotaFoglio_(ss, SH.CAND, CAND_HEADER);
     svuotaFoglio_(ss, SH.CONF, CONF_HEADER);
+    const chk = ss.getSheetByName(SH.CHK);   // nuova elezione: spunte e note da capo
+    if (chk) chk.clear();
     setCfg_('Formatore di riferimento', '');
   }
   applicaValidazioni_();
@@ -2870,6 +3062,7 @@ function azzeraElezione_(svuotaAnagrafiche) {
 function dopoAzzeramento_() {
   aggiornaReport();
   aggiornaUrna();
+  aggiornaChecklist();
   messaggiSicuro_();
 }
 

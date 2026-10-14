@@ -44,7 +44,10 @@ soc.getRange(4, 6).setValue('');                       // una societa resta senz
 // ---------------- Passo zero: si aprono le candidature ----------------
 console.log('=== Apre la raccolta delle candidature');
 setCfg_('Numero eletti', '');                          // la regola calcola i posti da se
+M.alerts.length = 0;
 richiestaCandidature();
+verifica(/NESSUNA MAIL È STATA INVIATA/.test(String(M.alerts[M.alerts.length - 1])),
+  'l\'avviso dice che preparare non e inviare');
 const apertura = foglio('Conferme').d.slice(1).filter(r => r[0]);
 verifica(apertura.length === 4, 'una richiesta per societa, anche a chi non si e ancora mosso: ' + apertura.length);
 verifica(apertura.every(r => r[2] === 'Richiesta di candidatura'), 'la colonna "Riguarda" dice di che si tratta');
@@ -65,7 +68,10 @@ verifica(M.email.every(e => /candidature aperte per la CTL$/.test(e.subject)),
   'con l\'oggetto della raccolta: "' + (M.email[0] || {}).subject + '"');
 
 console.log('\n=== Prepara le richieste');
+M.alerts.length = 0;
 preparaConferme();
+verifica(/NESSUNA MAIL È STATA INVIATA/.test(String(M.alerts[M.alerts.length - 1])),
+  'anche qui l\'avviso lo dice');
 const sh = foglio('Conferme');
 verifica(sh.d[0][0] === 'Destinatario' && sh.d[0][4] === 'Da inviare', 'il foglio ha le colonne giuste');
 const righe = sh.d.slice(1).filter(r => r[0]);
@@ -119,19 +125,24 @@ calcola1();
 preparaCommissari();
 const shCom = foglio('Commissari');
 shCom.d.slice(1).forEach((r, k) => { if (r[0]) shCom.getRange(k + 2, 8).setValue('c' + k + '@esempio-valido.it'); });
-shCom.getRange(2, 9).setValue(true);                      // il primo ha gia rinunciato
+shCom.getRange(2, 9).setValue(true);                      // il primo non accetta cariche
 M.alerts.length = 0;
 preparaConfermeCommissari();
 const conf = foglio('Conferme').d.slice(1).filter(r => r[0]);
 const nomiCom = commissari_().map(x => x.nome);
-verifica(conf.length === nomiCom.length - 1, 'un messaggio per commissario, meno chi ha gia rinunciato (' + conf.length + ')');
+verifica(conf.length === nomiCom.length, 'un messaggio per ogni commissario in elenco (' + conf.length + ')');
 verifica(conf.every(r => r[2] === 'Accettazione incarico in CTL'), 'la colonna "Riguarda" dice di che si tratta');
 verifica(conf.every(r => /risulti ELETTO/.test(String(r[3]))), 'il messaggio annuncia l\'elezione');
 verifica(conf.every(r => /accetti l'incarico/.test(String(r[3]))), 'e chiede di confermare l\'incarico');
 verifica(conf.every(r => /passa al primo dei non eletti/.test(String(r[3]))),
   'spiegando che adesso il posto scorre, dopo no');
 verifica(conf.every(r => !/#c=|\?c=/.test(String(r[3]))), 'e non contiene nessun link di voto');
-verifica(M.alerts.some(a2 => /gia rinunciatari/i.test(String(a2))), 'chi ha gia rinunciato viene segnalato, non disturbato');
+verifica(M.alerts.some(a2 => /Rinuncia alla carica/.test(String(a2))),
+  'chi non accetta cariche viene segnalato, ma la richiesta la riceve: riguarda il posto, non la carica');
+verifica(M.alerts.some(a2 => /"Rinuncia" nel foglio "Candidati"/.test(String(a2))),
+  'e l\'avviso dice dove si spunta la rinuncia all\'incarico');
+verifica(/NESSUNA MAIL È STATA INVIATA/.test(String(M.alerts[M.alerts.length - 1])),
+  'e l\'avviso ricorda che le mail non sono partite');
 
 M.email.length = 0;
 inviaConferme();
@@ -165,6 +176,8 @@ verifica(!quadro.scoperte.some(n => sqCoperte_().indexOf(n) >= 0),
   'mentre chi ha un commissario in carica non viene disturbato');
 M.alerts.length = 0;
 richiestaCandidatureScoperte();
+verifica(/NESSUNA MAIL È STATA INVIATA/.test(String(M.alerts[M.alerts.length - 1])),
+  'lo dice anche la richiesta alle societa scoperte');
 const scoperte = foglio('Conferme').d.slice(1).filter(r => r[0]);
 verifica(scoperte.length === quadro.scoperte.length, 'un messaggio per societa scoperta: ' + scoperte.length);
 verifica(scoperte.every(r => r[2] === 'Candidatura per un posto vacante'), 'la colonna "Riguarda" lo dice');

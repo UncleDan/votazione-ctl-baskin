@@ -1,5 +1,21 @@
 # Changelog
 
+## v42
+- **La procedura è dentro al file.** Nuovo foglio **Checklist**, secondo dopo *Config*: la sequenza completa dall'apertura delle candidature ai posti vacanti, una riga per passo, con la casella da spuntare e una colonna *Note*. Cita le voci di menu con il nome esatto, così non serve tenere aperto il documento a parte proprio il giorno in cui servirebbe già sotto gli occhi.
+- Si rigenera da *Checklist della procedura* e a ogni *Inizializza / aggiorna fogli*, per restare allineata alla versione del programma: **spunte e note vengono conservate**, riconosciute dal testo del passo. *Azzeramenti → Tutto* le azzera, perché una nuova elezione riparte da capo.
+- Impaginata per la stampa in A4 verticale, come il Verbale e il Riepilogo urna.
+- Nuova simulazione `test/simulazione-checklist.js`.
+
+## v41
+- **Le rinunce all'incarico si spuntano nel foglio "Candidati", e basta.** Spuntarle in *Commissari* non serviva a niente: quel foglio è derivato, e *Prepara commissari e link* lo riscrive da capo dagli eletti di *Risultati* — la spunta spariva e il commissario restava. Ora l'avviso lo dice, e la colonna di *Commissari* si chiama **Rinuncia alla carica**, che è l'unica cosa che ha sempre voluto dire: resto commissario, non faccio il Presidente né il Vice. Rinomina automatica, valori intatti.
+- **Le spunte "Rinuncia alla carica" non si perdono più** quando si rigenera il foglio: prima venivano azzerate insieme al resto. Si conservano, come già succedeva per gli indirizzi email.
+- **Prepara commissari e link si ferma** se in *Candidati* c'è una rinuncia che in *Risultati* risulta ancora ELETTO, invece di rigenerare un elenco sbagliato: dice chi, e che prima va rilanciato *Round 1 → Calcola risultati*. Era il passaggio che si saltava.
+- La richiesta di accettazione dell'incarico va ora a **tutti** i commissari in elenco: chi ha rinunciato all'incarico non è più nel foglio, e una rinuncia alla carica non è un motivo per non chiedergli se accetta il posto.
+
+## v40
+- **Preparare non è inviare, e adesso l'avviso lo dice.** Ogni voce che riempie il foglio *Conferme* o il foglio *Messaggi* chiude con una riga in chiaro: nessuna mail è partita, i testi si possono ancora rileggere e le spunte togliere, e la voce di invio chiede conferma mostrando oggetto e destinatari. Il foglio che si riempie di messaggi già spuntati sembrava dire il contrario.
+- L'avviso dei *Messaggi* ricorda anche l'unica eccezione: all'apertura del round l'avviso con il link personale parte da solo.
+
 ## v39
 - **La conferma dell'incarico si chiede entro poche ore, non entro giorni.** Il voto per il Presidente è fermo in attesa di quelle risposte, quindi una scadenza larga serve solo a farle arrivare tardi. Nuovo parametro *Config → Ore per confermare l'incarico* (di base 6); il messaggio riporta le ore **e** la data e ora precise — «entro 6 ore, cioè entro il 13/10/2026 19:30» — e spiega perché la finestra è stretta.
 - **Richiesta di candidatura alle società senza commissario**: *Richieste e conferme → Chiedi candidati alle società senza commissario*. Serve quando la graduatoria non basta più — dimissioni a commissione costituita, o troppe rinunce in fase di costituzione: dice quanti posti sono vacanti, che le riserve non bastano, e chiede una candidatura alle sole società non rappresentate. Chi ha rinunciato non copre la sua società, perché il suo posto è vacante. I commissari con una squadra non in elenco vengono segnalati, perché non sono attribuibili a nessuna società.

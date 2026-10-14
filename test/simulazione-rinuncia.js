@@ -114,7 +114,8 @@ preparaCommissari();
 const com = commissari_().map(x => x.nome);
 verifica(com.length === 4 && com.indexOf('Candidato A') < 0,
   'il foglio Commissari ha i 4 eletti, senza chi ha rinunciato: ' + com.join(', '));
-verifica(foglio('Commissari').d[0][8] === 'Rinuncia', 'e ha una colonna "Rinuncia" per le cariche');
+verifica(foglio('Commissari').d[0][8] === 'Rinuncia alla carica',
+  'e ha una colonna "Rinuncia alla carica", distinta da quella dei Candidati');
 
 // ---------------- Rinuncia alla carica di Presidente ----------------
 console.log('\n=== Presidente: il piu votato rinuncia alla carica');
@@ -129,6 +130,27 @@ calcola2();
 verifica(String(cfg_()['Presidente']) !== primo,
   'chi ha rinunciato non diventa Presidente anche se e il piu votato');
 verifica(!String(cfg_()['Presidente']), 'e senza altri voti la carica resta da assegnare');
+
+// ---------------- Il foglio Commissari si riscrive, le spunte no ----------------
+console.log('\n=== Riprepara i commissari: la rinuncia alla carica non si perde');
+preparaCommissari();
+verifica(commissari_().filter(x => x.rinuncia).map(x => x.nome).join() === primo,
+  'la spunta "Rinuncia alla carica" resta su ' + primo + ' anche dopo aver rigenerato il foglio');
+verifica(commissari_().length === 4, 'e i commissari restano 4');
+
+console.log('\n=== Rinuncia all\'incarico spuntata ma risultati non ricalcolati');
+sheet_('Candidati').getRange(3, colRin).setValue(true);     // Candidato B rinuncia adesso
+M.alerts.length = 0;
+const bloccato = preparaCommissari();
+verifica(bloccato === false, 'preparaCommissari si ferma invece di ignorare la rinuncia');
+verifica(/Calcola risultati/.test(String(M.alerts[M.alerts.length - 1])),
+  'e dice di ricalcolare prima i risultati: "' + String(M.alerts[M.alerts.length - 1]).split('\n')[0] + '"');
+verifica(commissari_().map(x => x.nome).indexOf('Candidato B') >= 0,
+  'il foglio Commissari resta com\'era: non lo tocca a meta');
+calcola1();
+preparaCommissari();
+verifica(commissari_().map(x => x.nome).indexOf('Candidato B') < 0,
+  'dopo il ricalcolo il posto scorre e Candidato B esce dalla Commissione');
 
 console.log(errori ? '\n' + errori + ' verifiche fallite.' : '\nTutte le verifiche superate.');
 process.exit(errori ? 1 : 0);

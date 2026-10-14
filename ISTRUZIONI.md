@@ -1,4 +1,4 @@
-# Votazione CTL Baskin — istruzioni (v38)
+# Votazione CTL Baskin — istruzioni (v42)
 
 Voto online anonimo, utilizzabile da telefono senza account Google:
 
@@ -12,6 +12,14 @@ Voto online anonimo, utilizzabile da telefono senza account Google:
 Il **Formatore di riferimento** non si vota: si indica in *Config*.
 
 Codice sorgente aperto: <https://github.com/UncleDan/votazione-ctl-baskin> (licenza MIT). Per trasparenza il link diretto e cliccabile, con il numero di versione, compare in fondo alla pagina di voto e in tutti i fogli di resoconto.
+
+## La checklist, dentro al foglio
+
+Il secondo foglio del file si chiama **Checklist** ed è la procedura dall'inizio alla fine: una riga per passo, con la casella da spuntare, divisa nelle sette fasi (controlli preliminari, candidature, round 1, ballottaggio, Presidente, Vice, chiusura, posti vacanti). Cita le voci di menu con il loro nome esatto, così non c'è da ricordarsi dove stava cosa.
+
+Si aggiorna da **🗳️ Votazione → Checklist della procedura**, e si rigenera da sola a ogni *Inizializza / aggiorna fogli*, per restare allineata alla versione del programma. **Le spunte e le Note non si perdono**: vengono riconosciute dal testo del passo e riscritte dov'erano. La colonna *Note* è tua — date, chi manca ancora, decisioni prese.
+
+A ricominciare da zero ci pensa *Azzeramenti → Tutto*, che insieme ai dati azzera anche le spunte. Il foglio è impaginato per la stampa in A4 verticale, se la si vuole su carta.
 
 ## Da dove si vota: app Google o pagina web
 
@@ -89,7 +97,9 @@ Non esiste un modulo da compilare: **basta una mail alla Sezione Territoriale**,
 
 Due parametri in *Config*: **Scadenza per le conferme** (testo libero, per esempio «venerdì 7 novembre», e vale sia per la raccolta sia per la conferma) e **Indirizzo per le candidature**. Quest'ultimo lasciato vuoto vale l'account che possiede il foglio — che è poi la casella della Sezione, la stessa da cui partono le mail — ma conviene scriverlo: se un giorno apri il foglio con un altro account, l'indirizzo nel messaggio cambierebbe senza che te ne accorga.
 
-**Richieste e conferme → Invia le richieste per email** manda alle righe spuntate nella colonna *Da inviare*, che alla preparazione sono tutte spuntate; dopo l'invio le spunte si tolgono, così per sollecitare qualcuno basta rispuntare la sua riga. L'oggetto cambia da solo secondo la richiesta preparata per ultima — raccolta, conferma, accettazione dell'incarico, candidatura per un posto vacante — così chi riceve capisce dal titolo di che si tratta. Queste mail **non contengono link di voto**: chiedono solo una risposta.
+**Preparare non è inviare.** Le voci che riempiono il foglio *Conferme* scrivono soltanto i messaggi: non parte nessuna mail, e l'avviso finale lo dice a chiare lettere, perché un foglio pieno di righe già spuntate sembra dire il contrario. Prima di mandare puoi rileggere i testi e togliere la spunta a chi non vuoi scrivere.
+
+**Richieste e conferme → Invia le richieste per email** manda alle righe spuntate nella colonna *Da inviare*, che alla preparazione sono tutte spuntate, e prima di partire mostra oggetto e destinatari e chiede conferma: finché non rispondi di sì non parte niente. Dopo l'invio le spunte si tolgono, così per sollecitare qualcuno basta rispuntare la sua riga. L'oggetto cambia da solo secondo la richiesta preparata per ultima — raccolta, conferma, accettazione dell'incarico, candidatura per un posto vacante — così chi riceve capisce dal titolo di che si tratta. Queste mail **non contengono link di voto**: chiedono solo una risposta.
 
 Il foglio *Conferme* ne ospita **una richiesta alla volta**: ogni voce lo riscrive da capo. È voluto — in giro ce n'è sempre una sola — ma vuol dire che se prepari la richiesta successiva prima di aver mandato la precedente, quella precedente la perdi.
 
@@ -103,7 +113,9 @@ Per questo, fra *Prepara commissari e link* e l'apertura del round 2, c'è **�
 
 La risposta si chiede **entro poche ore**, non entro la settimana: il voto per il Presidente è fermo in attesa, e una scadenza larga vuol dire solo che qualcuno risponderà l'ultimo giorno. Quante ore lo decidi in *Config → Ore per confermare l'incarico* (di base 6); il messaggio riporta le ore **e** la data e ora precise — «entro 6 ore, cioè entro il 13/10/2026 19:30» — perché «entro venerdì» si rimanda e un'ora esatta no. Senza risposta l'incarico si considera accettato, e il messaggio lo dice.
 
-Chi ha già la casella **Rinuncia** spuntata nel foglio *Commissari* non viene disturbato, e il programma te lo ricorda. Quando qualcuno rinuncia: spunti la sua casella e rilanci *Prepara commissari e link*, che rifà l'elenco con il subentrante.
+Quando qualcuno risponde di no, la rinuncia si spunta nel foglio **Candidati**, non in *Commissari*: è lì che il posto scorre al primo dei non eletti. L'ordine è: spunta *Rinuncia* in *Candidati* → *Round 1 → Calcola risultati* → *Prepara commissari e link*. Saltare il ricalcolo è l'errore facile — in *Risultati* resterebbe scritto ELETTO e il posto non scorrerebbe — quindi *Prepara commissari e link* si ferma e te lo dice invece di rigenerare l'elenco sbagliato.
+
+Il foglio *Commissari* è un foglio **derivato**: ogni *Prepara commissari e link* lo riscrive da capo dagli eletti di *Risultati*. Le uniche cose scritte a mano che conserva sono gli indirizzi email e le spunte *Rinuncia alla carica*; tutto il resto, se lo scrivi lì, alla rigenerazione successiva sparisce.
 
 ## Quando un posto resta vacante
 
@@ -124,7 +136,7 @@ Cosa succede, e perché:
 - **La scheda non cambia.** Chi ha rinunciato resta votabile fino alla chiusura. Toglierlo a urna aperta darebbe schede diverse a chi ha votato prima e a chi vota dopo, e le schede già depositate contengono il suo nome.
 - **I suoi voti si contano e restano nei risultati**, con esito `RINUNCIA`. Sono preferenze realmente espresse: cancellarle falserebbe il conteggio e il controllo «schede = codici usati».
 - **Non occupa il posto**: il posto scorre al primo dei non eletti, e *Prepara commissari e link* non lo include.
-- **Vale anche per le cariche**: la stessa casella c'è nell'ultima colonna del foglio *Commissari*, per chi non accetta la Presidenza o il ruolo di Vice.
+- **Rinunciare a una carica è un'altra cosa**: chi resta commissario ma non accetta la Presidenza o il ruolo di Vice si spunta nel foglio *Commissari*, ultima colonna, che per questo si chiama **Rinuncia alla carica**. Le due caselle non sono intercambiabili, e la rinuncia all'incarico va sempre e solo nel foglio *Candidati*.
 - **Conta nel vincolo sul numero**: chi rinuncia non fa più numero per il minimo di candidati.
 
 - **Finisce a verbale.** Nel *Verbale* la rinuncia è scritta per esteso, con il nome e la spiegazione: i voti restano contati, il posto non viene occupato.
@@ -211,7 +223,7 @@ Gli indirizzi stanno nella colonna **Email**: nel foglio *Società* per le socie
 
 **Più indirizzi per la stessa società** si scrivono nella stessa cella separati da virgola (o punto e virgola): una società ha spesso due referenti. Il messaggio arriva a tutti insieme, in una mail sola, e la scheda resta comunque una — il codice si usa una volta, chiunque dei due lo apra. Prima di mandare, l'avviso ti dice quali società hanno più di un indirizzo. Un indirizzo scritto male in mezzo agli altri non blocca gli altri: viene elencato a parte come da sistemare.
 
-Con un indirizzo presente hai due strade.
+Anche qui, **preparare non è inviare**: *Prepara i messaggi* riempie soltanto il foglio, e l'avviso finale lo dice. Le mail partono da sole in un caso solo, ed è l'apertura del round: l'avviso con il link personale va a tutti quelli che hanno un indirizzo, senza chiedere niente. Negli altri casi hai due strade.
 
 **Invia per email a chi ha l'indirizzo…** — nel sottomenu *Messaggi ai votanti*. Manda un messaggio per votante **dal tuo account Google**, uno alla volta e senza copia conoscenza, perché ogni link è personale. Come mittente i votanti vedono *Sezione Territoriale Baskin EISI* seguito dalla Sezione; si cambia in *Config → Mittente email*, e l'indirizzo di posta resta comunque quello del tuo account. Prima di partire ti dice chi riceverà, chi resta da avvisare a mano e quanta quota email ti resta per oggi. Gli indirizzi di prova (`@example.invalid` e simili) vengono saltati. A invio concluso controlla la posta inviata: quello che vedi lì è esattamente quello che hanno ricevuto.
 
@@ -271,7 +283,7 @@ Nel dialogo di stampa scegli **Foglio corrente**, formato **A4**, orientamento *
 
 ## L'ordine dei fogli
 
-*Inizializza / aggiorna fogli* rimette le schede in quest'ordine: prima i dati da compilare (*Config*, *Società*, *Squadre*, *Conferme*, *Candidati*), poi i documenti da leggere (*Verbale*, *Riepilogo urna*), poi quello che serve durante la votazione (*Ballottaggio*, *Commissari*), infine i risultati (*Risultati*, *Risultati Presidente*, *Risultati Vice*, *Risultati ballottaggi*) e i *Messaggi*.
+*Inizializza / aggiorna fogli* rimette le schede in quest'ordine: prima *Config* e la *Checklist*, poi i dati da compilare (*Società*, *Squadre*, *Conferme*, *Candidati*), poi i documenti da leggere (*Verbale*, *Riepilogo urna*), poi quello che serve durante la votazione (*Ballottaggio*, *Commissari*), infine i risultati (*Risultati*, *Risultati Presidente*, *Risultati Vice*, *Risultati ballottaggi*) e i *Messaggi*.
 
 I fogli non ancora creati si saltano, e un foglio aggiunto da te resta in coda dov'è: il programma non lo sposta e non lo tocca.
 
